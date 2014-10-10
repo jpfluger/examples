@@ -1,8 +1,10 @@
 # First updates, openssh-server and DHCP to Static IP
 
+> [Table of Contents](https://github.com/jpfluger/examples)
+
 First provision a server using Ubuntu 14.04 Server. During install, choose network access via DHCP and input your server name, domain, username and password. 
 
-* FQDN: svr1.example.com (Name=SVR1, Domain=example.com)
+* FQDN: svr1.example.com (Name=svr1, Domain=example.com)
 * IP: 192.168.1.2 (During setup use DHCP; we'll set the static ip later)
 * USER: myname
 * PASS: mypassword
@@ -80,7 +82,7 @@ iface eth0 inet static
    dns-nameservers 192.168.1.10
 ```
 
-Restart the server. We are restarting the server rather than restarting network services because if you are running these commands via ssh, the results are guaranteed.
+Restart the server. We are restarting the server rather than restarting network services because if you are running these commands via ssh, the results are guaranteed to cleanly exit the remote ssh session.
 
 ```bash
 sudo shutdown -r now
