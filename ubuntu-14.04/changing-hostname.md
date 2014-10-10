@@ -24,7 +24,7 @@ svr1
 
 And from `hostname -y`, which returns the domain name portion only:
 
-```bash
+```
 hostname: Local domain name not set
 ```
 
@@ -62,7 +62,7 @@ Edit your ip-to-fqdn mappings. In order for the fqdn to be recognized, it must b
 
 ```bash
 127.0.0.1       localhost
-127.0.1.1       svr1.apples.lan sv1
+127.0.1.1       svr1.example.com sv1
 ```
 
 ## Reassess the current name
