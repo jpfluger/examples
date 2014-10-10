@@ -1,6 +1,6 @@
-# Changing the hostname
+> Back to [Table of Contents](https://github.com/jpfluger/examples)
 
-> [Table of Contents](https://github.com/jpfluger/examples)
+# Changing the hostname
 
 ## Assess the current name
 
