@@ -24,7 +24,7 @@ Install nvm-global.
 wget -qO- https://raw.githubusercontent.com/xtuple/nvm/master/install.sh | sudo bash
 ```
 
-## use nvm
+## Use nvm
 
 List node versions currently installed
 
