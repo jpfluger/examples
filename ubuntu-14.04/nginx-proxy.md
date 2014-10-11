@@ -64,7 +64,7 @@ Create a new script file.
 sudo vim /usr/bin/nginx_modsite
 ```
 
-Add the content from Michael Lustfield\'s [script](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nginx/nginx_modsite.sh)
+Add the content from Michael Lustfield's [script](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nginx/nginx_modsite.sh)
 
 Make the script executable.
 
