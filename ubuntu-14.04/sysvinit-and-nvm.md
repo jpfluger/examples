@@ -21,13 +21,13 @@ sudo touch /etc/init.d/node-app
 sudo chmod a+x /etc/init.d/node-app
 ```
 
-Update the system service definitions
+Update the system service definitions. Note the number at the end of the command. A low number gets run first. I usually set my node apps with higher run-levels because of a time I could not get one program to run with the default `20`. 
 
 ```bash
-sudo update-rc.d node-app defaults
+sudo update-rc.d node-app defaults 92
 ```
 
-Open the file in an editor
+Open the file in an editor.
 
 ```bash
 sudo vim /etc/init.d/node-app
