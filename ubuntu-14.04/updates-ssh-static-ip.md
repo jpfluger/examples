@@ -1,6 +1,6 @@
 > Back to [Table of Contents](https://github.com/jpfluger/examples)
 
-# First updates, openssh-server and DHCP to Static IP
+# Post-Install Updates: openssh-server and DHCP to Static IP
 
 First provision a server using Ubuntu 14.04 Server. During install, choose network access via DHCP and input your server name, domain, username and password. 
 

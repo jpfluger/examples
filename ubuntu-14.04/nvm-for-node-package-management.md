@@ -1,6 +1,6 @@
 > Back to [Table of Contents](https://github.com/jpfluger/examples)
 
-# Using nvm for node package management
+# Using nvm for Node Package Management
 
 The production server is required to run node. But what if a new version of node comes out? What is the best way to manage the upgrade or downgrade process?  Especially on a production server?
 

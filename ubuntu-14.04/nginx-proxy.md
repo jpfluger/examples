@@ -1,6 +1,8 @@
 > Back to [Table of Contents](https://github.com/jpfluger/examples)
 
-# Installation
+# Nginx as Proxy
+
+## Installation
 
 Install a proxy server front-end and we can point the proxy to the desired background node process. 
 

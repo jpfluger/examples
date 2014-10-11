@@ -1,6 +1,6 @@
 > Back to [Table of Contents](https://github.com/jpfluger/examples)
 
-# Using nvm for node package management
+# Start/Stop the Node Daemon Using nvm and SysVinit
 
 [SysVinit](https://wiki.archlinux.org/index.php/SysVinit) is the first process executed and as such is the parent of all processes. SysVinit scripts are found in the /etc/init.d directory on debian-based systems. Maybe the following command is familiar to you?
 
