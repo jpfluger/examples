@@ -90,13 +90,14 @@ mkdir ~/prod
 
 # ssh
 ssh node-app-ps@svr1.example.com
+mkdir ~/prod
 ```
 
 The `prod` folder contains the source code (eg server.js). Each username created is unique for each production node application that has its own sysvinit script. The app's user credentials are used to scp files to the production server from source control or are obtained via git clone by the admin on the server. 
 
 ## Ownership of the production directory
 
-Who should the user:group owner be of the production directory, `/opt/node-prod-data`?  We just created the directory and explicitly assigned permissions to it, so that means the user is `node-app-ps` and the group is `node-app-ps`. But is that correct?  Shouldn't I do something more with `chmod` or `chown` to harden my system?
+Who should the user:group owner be of the `prod` directory?  The user is `node-app-ps` and the group is `node-app-ps`. But is that correct?  Shouldn't I do something more with `chmod` or `chown` to harden my system?
 
 > Note: Some file ownership strategies can be found at [Digital Ocean](https://www.digitalocean.com/community/tutorials/how-to-use-pm2-to-setup-a-node-js-production-environment-on-an-ubuntu-vps), examples from [Securing Apache](http://www.thegeekstuff.com/2011/03/apache-hardening/) and [Ruby on Apache](http://stackoverflow.com/questions/6037286/what-permissions-are-needed-for-apache-passenger), and [nvm sudo errors](http://stackoverflow.com/questions/16151018/npm-throws-error-without-sudo).
 
