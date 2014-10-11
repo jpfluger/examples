@@ -5,7 +5,7 @@
 # The name "myapp" is a DNS entry
 # It could be named anything, even "node-app" to match the node-process
 upstream myapp.example.com {
-      server 192.168.1.2:1337; # The nvm-node process running "node-app"
+      server 127.0.0.1:1337; # The nvm-node process running "node-app"
 }
 
 server {

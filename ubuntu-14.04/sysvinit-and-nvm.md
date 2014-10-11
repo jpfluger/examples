@@ -131,6 +131,15 @@ $ sudo pstree -p 13256
 nvm(13256)───node(13287)───{node}(13288)
 ```
 
+View by ip:port.
+
+```bash
+sudo netstat -ntulp | grep LISTEN | grep node
+
+# OUTPUT
+tcp        0      0 127.0.0.1:1337          0.0.0.0:*               LISTEN      13287/node
+```
+
 So far so good. Let's stop the server.
 
 ```bash
