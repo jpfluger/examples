@@ -1,0 +1,15 @@
+lib-cov
+lcov.info
+
+*.log
+
+pids
+logs
+results
+build
+.grunt
+
+.git*
+.DS_Store
+.zz/
+node_modules/

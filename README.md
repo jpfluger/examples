@@ -15,4 +15,10 @@ Post-Install for a node-based web-server using nvm for node version management:
   7. Not started... [Munin stats](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/munin-stats.md)
   8. Not started... [Nagios monitoring](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nagios-monitoring.md)
 
+Additional services
+
+  1. [Private NPM Registry with Sinopia](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/sinopia.md)
+
+---
+
 ## [MIT Licensed](LICENSE)

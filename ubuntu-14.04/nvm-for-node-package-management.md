@@ -26,7 +26,7 @@ wget -qO- https://raw.githubusercontent.com/xtuple/nvm/master/install.sh | sudo 
 
 ## Use nvm
 
-List node versions currently installed
+List node versions currently installed.
 
 ```bash
 sudo nvm ls

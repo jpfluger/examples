@@ -1,0 +1,29 @@
+{
+	"name": "local-examples",
+	"version": "0.0.4",
+	"publishConfig" : {
+		"registry": "http://sinopia.apples.lan/"
+	},
+	"description": "Publishing example locally to Sinopia instance",
+	"author": {
+		"name": "Jaret Pfluger",
+		"email": "japes@aberlorn.com"
+	},
+	"homepage": "https://github.com/jpfluger",
+	"license": "MIT",
+	"engines": {
+		"node": ">=0.10"
+	},
+	"bin": {
+	},
+	"main": "./bin/zazzy-init",
+	"keywords": [
+		"example",
+		"tutorial",
+		"Ubuntu"
+	],
+	"dependencies": {
+	},
+	"devDependencies": {
+	}
+}

@@ -27,6 +27,9 @@ Update the system service definitions. Note the number at the end of the command
 sudo update-rc.d node-app defaults 92
 ```
 
+> For reference, to remove update-rc.d linkages to the sysvinit script, run `sudo update-rc.d -f node-app remove`. 
+
+
 Open the file in an editor.
 
 ```bash
