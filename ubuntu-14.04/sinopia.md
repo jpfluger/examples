@@ -6,7 +6,7 @@ Sinopia is a npm server installed locally. It caches public repositories publish
 
 Many of the examples below came from [Sinopia](https://github.com/rlidwka/sinopia) on GitHub and Dylan Smith's [instructive tutorial](https://blog.dylants.com/2014/05/10/creating-a-private-npm-registry-with-sinopia/).
 
-My additions incorporate using Sinopia with nvm, sysvinit and monit. For detailed implementation of these refer to the Ubuntu 14.04 [post-install](https://github.com/jpfluger/examples) section.
+My additions incorporate using Sinopia with nvm, sysvinit and monit. For a detailed implementation of these refer to the Ubuntu 14.04 [post-install](https://github.com/jpfluger/examples) section.
 
 ## Installation
 
