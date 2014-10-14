@@ -1,4 +1,5 @@
 > Back to [Table of Contents](https://github.com/jpfluger/examples)
 
-# Munin for Graphical Statistics
+# Munin central server using nginx
+
 
