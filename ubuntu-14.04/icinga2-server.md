@@ -310,6 +310,8 @@ Paste this into `index.php`.
 
 ---
 
+#I DON'T THINK WE NEED THIS ANYMORE (for icinga classic ?)
+
 We'll need the `htpasswd` utility from the apache2 project. We are only installing the utilities and not apache2 itself.
 
 ```bash
@@ -446,7 +448,7 @@ sudo apt-get install make
 
 Install it.
 
-``bash
+```bash
 sudo make install
 
 #END OF OUTPUT
