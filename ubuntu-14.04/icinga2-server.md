@@ -264,12 +264,34 @@ Instead let's create a new nginx site that will test our php installation.
 sudo vim /etc/nginx/sites-available/icinga.example.com
 ```
 
-Enter the following. We'll create the root directory for `test-php` shortly after this step.
+Enter the following. We'll create the root directory for `test-php` and the user-password file after this step.
 
 ```nginx
+#VERSION: "test-php"
+server {
+   listen      192.168.1.3:80;
+   server_name icinga.example.com;
+   access_log  /var/log/nginx/icinga.example.com.access.log  main;
+   error_log   /var/log/nginx/icinga.example.com.error.log;
+   root        /path/to/root/folder/test-php;
+   index       index.php;
 
+   location / {
+      auth_basic   "Restricted";
+      auth_basic_user_file  /home/avatar/htpasswd.users;
+   }
 
+   location ~ \.php$ {
+      try_files $uri =404;
+      fastcgi_pass unix:/var/run/php5-fpm.sock;
+      fastcgi_index index.php;
+      fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+      include fastcgi_params;
+   }
+}
 ```
+
+---
 
 Create the `test-php` root directory and open `index.php` in an editor.
 
@@ -286,38 +308,192 @@ Paste this into `index.php`.
 ?>
 ```
 
-Restart processes.
+---
+
+We'll need the `htpasswd` utility from the apache2 project. We are only installing the utilities and not apache2 itself.
 
 ```bash
+sudo apt-get install apache2-utils
 ```
 
+Crate the htpasswd.users file in the root web folder with the username of `icingaadmin`. You will be prompted to enter a password.
 
+```bash
+htpasswd -c /path/to/root/folder/htpasswd.users icingaadmin
+```
+
+---
+
+Enable the site and restart services.
+
+```bash
+sudo nginx_modsite -d default
+sudo nginx_modsite -e icinga.example.com
+sudo service nginx restart
+```
+
+Reload your browser. You should now see the information passed back from `phpinfo()`.
+
+```
+http://icinga.example.com
+```
 ## Install Icinga-Web
 
+For this example, the root folder of the website will be /home/USER/icinga-web. This example uses release v1.11.2. See [this website](https://github.com/Icinga/icinga-web/releases) for the latest production releases.
+
+Download using `wget`.
+
+```bash
+cd ~/
+wget https://github.com/Icinga/icinga-web/releases/download/v1.11.2/icinga-web-1.11.2.tar.gz
+```
+
+Extract.
+
+```bash
+tar xzvf icinga-web-1.11.2.tar.gz
+```
+
+Create the production directory for this website.
+
+```bash
+mkdir -p ~/prod/icinga-web
+```
+
+Dive into postgres and create the icinga_web role and database.
+
+```
+$ sudo -u postgres psql
+```
+
+Enter the following postgres commands. Change the default PASSWORD of `icinga_web` to something more secure.
+
+```
+postgres=# CREATE USER icinga_web WITH PASSWORD 'icinga_web';
+  CREATE ROLE
+postgres=# CREATE DATABASE icinga_web;
+  CREATE DATABASE
+postgres=# \q
+```
+
+Give the user `icinga_web` trusted authentication rights to start-stop postgresql by adding the following  to `pg_hba.conf`.  First open the file.
+
+```bash
+sudo vim /etc/postgresql/9.3/main/pg_hba.conf
+```
+
+At the bottom, add:
+
+```
+local   icinga_web      icinga_web                            trust
+host    icinga_web      icinga_web      127.0.0.1/32          trust
+host    icinga_web      icinga_web      ::1/128               trust
+```
+
+Restart postgresql.
+
+```bash
+sudo service postgresql restart
+```
+
+Let's change into folder of the tarball we just extracted.
+
+```bash
+cd icinga-web-1.11.2/
+```
+
+Create the icinga_web database objects by importing them in from the existing schema file.  
+
+```bash
+psql -U icinga_web -d icinga_web -h localhost -a -f etc/schema/pgsql.sql
+```
+
+Configure the site. 
+
+```
+./configure \
+                --prefix=/home/avatar/prod/icinga-web \
+                --with-web-user=www-data \
+                --with-web-group=www-data \
+                --with-web-path=/icinga-web \
+				--with-db-type=pgsql \
+				--with-db-port=5432 \
+                --with-db-host=localhost \
+				--with-api-subtype=pgsql \
+				--with-api-port=5432 \
+                --with-api-host=localhost \
+                --with-db-name=icinga_web \
+                --with-db-user=icinga_web \
+                --with-db-pass=icinga_web \
+                --with-log-dir=/var/log
+
+#END OF OUTPUT
+icinga-web successfully configured!
+
+Please proceed with make to install your icinga-web instance:
+
+ * make               Some general hints about make targets
+ * make install       Install a new instance of icinga-web
+ * make upgrade       Upgrades an existing installation:
+                      keep site config files untouched!
+```
+
+We need make installed before we can `make install`.
+
+```bash
+sudo apt-get install make
+```
+
+Install it.
+
+``bash
+sudo make install
+
+#END OF OUTPUT
+Installation if icinga-web succeeded.
+
+Please check the new Apache2 configuration (/etc/apache2/conf.d/icinga-web.conf).
+
+You can install it simply by invoking 'make install-apache-config'.
+
+If you don't want this you can restore its old behavior by
+typing 'make install-javascript'. This will install the old symlinks.
+
+If you want to setup your database manually, you can find the scripts 
+at etc/schema, otherwise use make db-initialize.
+
+Have fun!
+```
+
+Test php dependencies.
+
+```bash
+sudo make testdeps
+
+#END OF OUTPUT
+All over result: PASS (required 12/12, optional 9/11, all 21/23, time 0.01s)
+
+Exit (status=0)
+```
+
+## Bringing up the website with nginx
+
+TO-DO..... 
+
+[Thank You!](http://www.monitoring-portal.org/wbb/index.php?page=Thread&threadID=29035)
+
+...will update soon.
+
+* Default user: `root`
+* Default password: `password`
 
 
+---
+---
+---
 
 
-
-
-
-
-
-
-sudo apt-get install nginx                                  fcgiwrap icinga-cgi icinga-common icinga-core icinga-doc
-
-sudo apt-get install php5 
- php5-mysql 
-
-
-git clone git://git.icinga.org/icinga-web.git
-
-* PHP 5.2.6+ (cli, pear, xmlrpc, xsl, soap, gd, ldap, json, gettext, sockets)
-* PHP PDO MySQL or PostgreSQL
-* MySQL or PostgreSQL database for the internal backend (sesssions, etc)
-* XML Syntax-highlighting for your preferred editor
-
-
+## Configurations
 
 Enable the External Command Pipe using to allow web interfaces and other Icinga addons send commands.
 

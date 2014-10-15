@@ -69,7 +69,7 @@ Add the content from Michael Lustfield's [script](https://github.com/jpfluger/ex
 Make the script executable.
 
 ```bash
-sudo +x /usr/bin/nginx_modsite
+sudo chmod +x /usr/bin/nginx_modsite
 ```
 
 ## Script commands
