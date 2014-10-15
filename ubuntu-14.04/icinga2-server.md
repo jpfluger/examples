@@ -73,6 +73,8 @@ Install postgresql.
 sudo apt-get install postgresql
 ```
 
+# NO- MANUAL SETUP BETTER (REDO)
+
 Install the icinga2 module that communicates with postgresql. For the password in this example, I used `"icinga"`.
 
 ```bash
@@ -484,6 +486,20 @@ TO-DO.....
 
 [Thank You!](http://www.monitoring-portal.org/wbb/index.php?page=Thread&threadID=29035)
 
+
+sudo ln -s /home/avatar/prod/icinga-web/lib /home/avatar/prod/icinga-web/pub/js
+
+
+mkdir prod/icinga
+
+sudo ln -s /home/avatar/prod/icinga-web/pub /home/avatar/prod/icinga/icinga-web
+
+/var/www/icinga (empty directory as base root dir)
+/var/www/icinga/icinga-web -> Symlink to /usr/share/icinga-web/pub
+/usr/share/icinga-web/pub/js -> Symlink to /usr/share/icinga-web/lib
+
+sudo chown -R www-data:www-data .
+
 ...will update soon.
 
 * Default user: `root`
@@ -493,6 +509,20 @@ TO-DO.....
 ---
 ---
 ---
+
+
+
+
+
+# local icinga_web needs to register before local all else local all 
+# takes precedence
+local   icinga_web      icinga_web                            trust
+host    icinga_web      icinga_web      127.0.0.1/32          trust
+host    icinga_web      icinga_web      ::1/128               trust
+# Database administrative login by Unix domain socket
+local   all             postgres                                peer
+
+
 
 
 ## Configurations
