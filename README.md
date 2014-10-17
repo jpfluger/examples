@@ -19,7 +19,7 @@ Additional services
 
   1. [Private NPM Registry with Sinopia](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/sinopia.md)
   2. In Progress... [Munin central server using nginx](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/munin-server.md) (aggregates host node reports)
-  3. In Progress... [Icinga2 central server using nginx and postgresql](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/icinga2-server.md)  (aggregates host node Nagios notifications (NPRE))
+  3. [Icinga2 central server using nginx and postgresql](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/icinga2-server.md)  (aggregates host node Nagios notifications (NPRE))
 
 ---
 
