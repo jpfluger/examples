@@ -15,14 +15,14 @@ They assume a core Ubuntu 14.04 installation with a fully-qualified-domain-name 
 
 This example will be covering the following:
 
-* [Install Icinga2](#install-icinga2-)
+* [Install Icinga2](#install-icinga2)
 * [Install Postgresql and let Icinga2 use it for storage](#install-postgresql-and-let-icinga2-use-it-for-storage)
-* [Install Nginx, PHP and Postgres dependencies](#install-nginx-php-and-postgres-dependencies-)
-* [Install Icinga-Web (not Icinga-Classic nor Icinga-Web2)](#install-icinga-web-)
-* [Run Icinga-Web using Nginx](#run-icinga-web-using-nginx-)
-* [Tests](#tests-)
-* [Ping a 2nd Host and Additional Configurations](#ping-a-2nd-host-and-additional-configurations-)
-* [My Default Setup (for comparison)](#my-default-setup-for-comparison-)
+* [Install Nginx, PHP and Postgres dependencies](#install-nginx-php-and-postgres-dependencies)
+* [Install Icinga-Web (not Icinga-Classic nor Icinga-Web2)](#install-icinga-web)
+* [Run Icinga-Web using Nginx](#run-icinga-web-using-nginx)
+* [Tests](#tests)
+* [Ping a 2nd Host and Additional Configurations](#ping-a-2nd-host-and-additional-configurations)
+* [My Default Setup (for comparison)](#my-default-setup-for-comparison)
 
 I chose Icinga instead of Nagios because I wanted to integrate with Postgres. Also the web-interface is slick and, since Icinga is a fork of Nagios, any plugins developed for Nagios will work in Icinga.
 
