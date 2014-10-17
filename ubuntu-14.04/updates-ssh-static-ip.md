@@ -99,3 +99,17 @@ ifconfig
 ---
 
 Make certain the network DNS server has an entry for svr1.example.com.
+
+## Optional: change the `sudo` timeout
+
+If you want to avoid having to enter the `sudo` password every 2 minutes, then follow these directions. After setup, remember to delete this for a production environment.
+
+```bash
+sudo visudo
+```
+
+Find the line with `Default   env_reset` and change to something else. The time is in minutes. "-1" says never use a password prompt. 43200 is 30 days worth of minutes.
+
+```vim
+Defaults    env_reset,timestamp_timeout=43200
+```
