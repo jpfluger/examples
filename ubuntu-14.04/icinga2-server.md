@@ -15,20 +15,20 @@ They assume a core Ubuntu 14.04 installation with a fully-qualified-domain-name 
 
 This example will be covering the following:
 
-* [Install Icinga2](#install-icinga2)
-* [Install Postgresql and let Icinga2 use it for storage](#install-postgres)
-* [Install Nginx, PHP and Postgres dependencies](#install-nginx)
-* [Install Icinga-Web (not Icinga-Classic nor Icinga-Web2)](#install-icinga-web)
-* [Run Icinga-Web using Nginx](#run-with-nginx)
-* [Test](#test)
-* [Ping a 2nd Host and Additional Configurations](#additional)
-* [My Default Setup (for comparison)](#compare)
+* [Install Icinga2](#install-icinga2-)
+* [Install Postgresql and let Icinga2 use it for storage](#install-postgresql-and-let-icinga2-use-it-for-storage)
+* [Install Nginx, PHP and Postgres dependencies](#install-nginx-php-and-postgres-dependencies-)
+* [Install Icinga-Web (not Icinga-Classic nor Icinga-Web2)](#install-icinga-web-)
+* [Run Icinga-Web using Nginx](#run-icinga-web-using-nginx-)
+* [Tests](#tests-)
+* [Ping a 2nd Host and Additional Configurations](#ping-a-2nd-host-and-additional-configurations-)
+* [My Default Setup (for comparison)](#my-default-setup-for-comparison-)
 
 I chose Icinga instead of Nagios because I wanted to integrate with Postgres. Also the web-interface is slick and, since Icinga is a fork of Nagios, any plugins developed for Nagios will work in Icinga.
 
 > Note: The examples were compiled chiefly from these sources: [Icinga 2 Getting Started Documentation](http://docs.icinga.org/icinga2/latest/doc/module/icinga2/chapter/getting-started#installing-requirements) and GitHub [Install Readme](https://github.com/Icinga/icinga-web/blob/master/doc/INSTALL) for Icinga-Web.
 
-## Install Icinga2 <a id="install-icinga2"></a>
+## Install Icinga2
 
 Let's install the Icinga `ppa` on Ubuntu 14.04.
 
@@ -139,7 +139,7 @@ Creating your own plugins.
 
 Icinga2 offers suggestions on what you need to do to design your own plugin. See the [Icinga 2 Getting Started Documentation](http://docs.icinga.org/icinga2/latest/doc/module/icinga2/chapter/getting-started#installing-requirements) for integrating additional plugins.
 
-## Install Postgresql and let Icinga2 use it for storage<a id="install-postgres"></a>
+## Install Postgresql and let Icinga2 use it for storage
 
 Install postgresql.
 
@@ -270,7 +270,7 @@ Restart icinga2.
 sudo service icinga2 restart
 ```
 
-## Install Nginx, PHP and Postgres dependencies <a id="install-nginx"></a>
+## Install Nginx, PHP and Postgres dependencies
 
 Install nginx, php and postgres dependencies.
 
@@ -391,7 +391,7 @@ Reload your browser. You should now see the information passed back from `phpinf
 http://icinga.example.com
 ```
 
-## Install Icinga-Web <a id="install-icinga-web"></a>
+## Install Icinga-Web
 
 We are going to install Icinga-Web, which is not Icinga-Classic nor Icinga-Web2. Icinga-Web is compatible with both Icinga and Icinga2 modules. Many of the Debian/Ubuntu-related tutorials on the internet are for Icinga-Classic. This example is not Icinga-Classic; it is for Icinga-Web, which is Icinga's current "flagship" interface. Please see [this page](https://www.icinga.org/icinga/screenshots/) to begin investigating differences.
 
@@ -532,7 +532,7 @@ All over result: PASS (required 12/12, optional 9/11, all 21/23, time 0.01s)
 Exit (status=0)
 ```
 
-## Run Icinga-Web using Nginx <a id="run-with-nginx"></a>
+## Run Icinga-Web using Nginx
 
 > Credits: A huge **THANK YOU** goes to "Rancor" [on this thread](http://www.monitoring-portal.org/wbb/index.php?page=Thread&threadID=29035), who posted a working solution for Nginx and Icinga-Web.
 
@@ -653,7 +653,7 @@ Your default interface should look like mine with zero errors!
 
 ![Default Icinga-Web Interface](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/icinga2/icinga-web-default.png)
 
-## Tests <a id="test"></a>
+## Tests
 
 The server we just configured monitors in two ways:
 
@@ -710,7 +710,7 @@ $ls /etc/icinga2/conf.d/hosts/localhost
 apt.conf  disk.conf  http.conf  icinga.conf  load.conf  procs.conf  ssh.conf  swap.conf  users.conf
 ```
 
-## Ping a 2nd Host and Additional Configurations <a id="additional"></a>
+## Ping a 2nd Host and Additional Configurations
 
 Now is a good time to read through [Monitoring Basics](http://docs.icinga.org/icinga2/latest/doc/module/icinga2/chapter/monitoring-basics#monitoring-basics).
 
@@ -862,7 +862,7 @@ sudo service icinga2 restart
 
 Go to the web interface and refresh it. On the left navigation bar, click on `Host groups` and the `Hostgroups Tab` will appear. Click the icon left of the name, then click `Hosts` or `Services` to inspect them.
 
-## My Default Setup (for comparison) <a id="compare"></a>
+## My Default Setup (for comparison)
 
 Here are the packages that were installed in this example.
 
