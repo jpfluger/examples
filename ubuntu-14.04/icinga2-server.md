@@ -5,9 +5,11 @@
 Let's be very clear. There are two components to monitoring. 
 
 * Central Server: we are using icinga 2 for the core and icinga web for the GUI (version 2 of the web interface is still under "heavy development")
-* Clients: Any server we want to monitor will have Nagios Remote Plugin Executor (NRPE)
+* Clients: Any server we want to monitor will be monitored in one of two ways:
+  1. The central server uses ping, http or other commands to execute against the targeted device. No modules are installed on the targeted device.
+  2. Install Nagios Remote Plugin Executor (NRPE) installed on the target server. NRPE will communicate with Icinga2.
 
-The examples below cover setting up the **Central Server**. For setting up the **Client** to communicate with Icinga, see [this example](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nagios-npre-client.md).
+The examples below cover setting up the **Central Server** and monitoring from the Central Server outwards towards targeted host devices. For setting up **NPRE** to communicate with Icinga, see [this example](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nagios-npre-client.md).
 
 They assume a core Ubuntu 14.04 installation with a fully-qualified-domain-name of 'icinga.example.com'. The server name should be configured in DNS and accessible via ssh.
 
@@ -712,7 +714,7 @@ apt.conf  disk.conf  http.conf  icinga.conf  load.conf  procs.conf  ssh.conf  sw
 
 Now is a good time to read through [Monitoring Basics](http://docs.icinga.org/icinga2/latest/doc/module/icinga2/chapter/monitoring-basics#monitoring-basics).
 
-Create a configuration file to monitor `srv1.example.com`, which is the NodeJS web server we setup in other examples. See the [Table of Contents](https://github.com/jpfluger/examples).
+Create a configuration file to monitor `srv1.example.com`, which is the NodeJS web server we setup in other examples (e.g. refer to [Table of Contents](https://github.com/jpfluger/examples)).
 
 ```bash
 sudo vim /etc/icinga2/conf.d/hosts/svr1.conf
