@@ -19,10 +19,12 @@ This example will be covering the following:
 * Install Icinga-Web (not Icinga-Classic nor Icinga-Web2)
 * Run Icinga-Web using Nginx
 * Test
+* Ping a 2nd Host and Additional Configurations
+* My Default Setup (for comparison)
 
 I chose Icinga instead of Nagios because I wanted to integrate with Postgres. Also the web-interface is slick and, since Icinga is a fork of Nagios, any plugins developed for Nagios will work in Icinga.
 
-> Note: The examples were compiled chiefly from these sources: [Icinga 2 Getting Started Documentation](http://docs.icinga.org/icinga2/latest/doc/module/icinga2/chapter/getting-started#installing-requirements), GitHub [Install Readme](https://github.com/Icinga/icinga-web/blob/master/doc/INSTALL) for Icinga-Web and [Icincga-Web From Scratch](http://docs.icinga.org/latest/en/icinga-web-scratch.html).
+> Note: The examples were compiled chiefly from these sources: [Icinga 2 Getting Started Documentation](http://docs.icinga.org/icinga2/latest/doc/module/icinga2/chapter/getting-started#installing-requirements) and GitHub [Install Readme](https://github.com/Icinga/icinga-web/blob/master/doc/INSTALL) for Icinga-Web.
 
 ## Install Icinga2
 
@@ -63,6 +65,12 @@ More plugins are available via [The Monitoring Plugins](https://www.monitoring-p
 
 ```bash
 sudo apt-get install nagios-plugins
+```
+
+Refresh the plugins list.
+
+```basg
+ls /usr/lib/nagios/plugins
 
 #OUTPUT
 check_apt      check_dbi       check_dns       check_host       check_ifoperstatus  check_ldap   check_mrtg         check_nntp      check_ntp_time  check_ping   check_rta_multi  check_spop   check_time   negate
@@ -72,7 +80,62 @@ check_clamd    check_disk      check_flexlm    check_icmp       check_ircd      
 check_cluster  check_disk_smb  check_ftp       check_ide_smart  check_jabber        check_mailq  check_nagios       check_ntp_peer  check_pgsql     check_rpc    check_snmp       check_tcp    check_wave
 ```
 
-See the [Icinga 2 Getting Started Documentation](http://docs.icinga.org/icinga2/latest/doc/module/icinga2/chapter/getting-started#installing-requirements) for integrating additional plugins.
+Other commands, such as `ping4`, are found in the Icinga Template Library (ITL). The `include` directory for ITL is in `/usr/share/icinga2/include/`. 
+
+Here are some of the ITL commands provided by `command-plugins.conf`.
+
+```bash
+ sudo cat /usr/share/icinga2/include/command-plugins.conf | grep CheckCommand
+
+ #OUTPUT
+template CheckCommand "ping-common" {
+object CheckCommand "ping4" {
+object CheckCommand "ping6" {
+object CheckCommand "hostalive" {
+template CheckCommand "fping-common" {
+object CheckCommand "fping4" {
+object CheckCommand "fping6" {
+object CheckCommand "dummy" {
+object CheckCommand "passive" {
+object CheckCommand "tcp" {
+object CheckCommand "ssl" {
+object CheckCommand "udp" {
+object CheckCommand "http" {
+object CheckCommand "ftp" {
+object CheckCommand "smtp" {
+object CheckCommand "ssmtp" {
+object CheckCommand "imap" {
+object CheckCommand "simap" {
+object CheckCommand "pop" {
+object CheckCommand "spop" {
+object CheckCommand "ntp_time" {
+object CheckCommand "ssh" {
+object CheckCommand "disk" {
+object CheckCommand "users" {
+object CheckCommand "procs" {
+object CheckCommand "swap" {
+object CheckCommand "load" {
+object CheckCommand "snmp" {
+object CheckCommand "snmpv3" {
+object CheckCommand "snmp-uptime" {
+object CheckCommand "apt" {
+object CheckCommand "dhcp" {
+object CheckCommand "dns" {
+object CheckCommand "dig" {
+object CheckCommand "nscp" {
+object CheckCommand "by_ssh" {
+object CheckCommand "ups" {
+object CheckCommand "nrpe" {
+object CheckCommand "running_kernel" {
+```
+
+A template is reusable. In the output above, `ping4` and `ping6` inherit from `ping-common` and use those properties to run its checks.
+
+---
+
+Creating your own plugins.
+
+Icinga2 offers suggestions on what you need to do to design your own plugin. See the [Icinga 2 Getting Started Documentation](http://docs.icinga.org/icinga2/latest/doc/module/icinga2/chapter/getting-started#installing-requirements) for integrating additional plugins.
 
 ## Install Postgresql and let Icinga2 use it for storage
 
@@ -232,7 +295,7 @@ Enter the following. We'll create the root directory for `test-php` and the user
 ```nginx
 #VERSION: "test-php"
 server {
-   listen      192.168.1.3:80;
+   listen      0.0.0.0:80;
    server_name icinga.example.com;
    access_log  /var/log/nginx/icinga.example.com.access.log  main;
    error_log   /var/log/nginx/icinga.example.com.error.log;
@@ -247,6 +310,40 @@ server {
       include fastcgi_params;
    }
 }
+```
+
+---
+
+Change the default timezone, else Icinga-Web will GMT.
+
+What does `cat /etc/timezone` return?
+
+```bash
+cat /etc/timezone 
+
+#OUTPUT
+America/Chicago
+```
+
+Change `php.ini`.
+
+```bash
+sudo vim /etc/php5/fpm/php.ini
+```
+
+Find `timezone` and comment it in.
+
+```php
+[Date]
+; Defines the default timezone used by the date functions
+; http://php.net/date.timezone
+date.timezone = America/Chicago
+```
+
+Restart php services.
+
+```bash
+sudo service php5-fpm restart
 ```
 
 ---
@@ -448,10 +545,10 @@ Copy the following into the editor. In three places, you will need to replace `/
 ```nginx
 #VERSION: "icinga.example.com"
 server {
-        listen      10.10.11.6:80;
-        server_name icinga.apples.lan;
-        access_log  /var/log/nginx/icinga.apples.lan.access.log  main;
-        error_log   /var/log/nginx/icinga.apples.lan.error.log;
+        listen      0.0.0.0:80;
+        server_name icinga.example.com;
+        access_log  /var/log/nginx/icinga.example.com.access.log  main;
+        error_log   /var/log/nginx/icinga.example.com.error.log;
         root        /var/www/icinga;
         index index.php index.html index.htm;
 
@@ -489,6 +586,8 @@ server {
         }
 }
 ```
+
+> Note: `listen` is set to `0.0.0.0:80`, which directs nginx to listen on all ip addresses on port 80. This is important as Icinga2's default localhost configuration for `http` has `localhost` as its `hostname`.
 
 Create a symlink from the `lib` folder to the javascript folder inside`/PATH/TO/PROD/DIRECTORY`.
 
@@ -546,17 +645,318 @@ The default Icinga-Web user and password are the following:
 * Default user: `root`
 * Default password: `password`
 
-You should be greated with the following screenshot with zero errors!
+Credentials can be changed after login. On the top-left of the window, you'll see an `Admin` menu. Navigate into there to start administering users.
 
-![Results of myapp in browser](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nginx/myapp-hello-world.png)
+Your default interface should look like mine with zero errors!
+
+![Default Icinga-Web Interface](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/icinga2/icinga-web-default.png)
+
+## Tests
+
+The server we just configured monitors in two ways:
+
+1. Local configs that target an action to itself (eg localhost) or towards a different device (eg using the ping command)
+2. Communicating directly with a device using the NPRE module, installed on the other device. See [this example](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nagios-npre-client.md) for configuring NPRE on a different device.
+
+As mentioned earlier, plugin commands were installed into `/usr/lib/nagios/plugins/`.
+
+View help for a command by passing the targeted command the `-h` parameter.
+
+```bash
+sudo /usr/lib/nagios/plugins/check_http -h | less
+```
+
+Run a command, passing it arguments.
+
+```bash
+$ sudo /usr/lib/nagios/plugins/check_http -H localhost -p 80
+
+#OUTPUT (expected == GOOD)
+HTTP OK: HTTP/1.1 301 Moved Permanently - 398 bytes in 0.000 second response time |time=0.000418s;;;0.000000 size=398B;;;0
+
+#OUTPUT (example of what's returned for a non-existent http check)
+No route to host
+HTTP CRITICAL - Unable to open TCP socket
+```
+
+---
+
+Icinga2 global configurations start in `/etc/icinga2/conf.d/` and narrow down to specific devices.
+
+```bash
+$ls /etc/icinga2/conf.d/
+
+#OUTPUT
+commands.conf  downtimes.conf  groups.conf  hosts  notifications.conf  services.conf  templates.conf  timeperiods.conf  users.conf
+```
+
+Look in hosts. This is where you put your local and target device configurations.
+
+```bash
+$ls /etc/icinga2/conf.d/hosts
+
+#OUTPUT
+localhost  localhost.conf
+```
+
+Inside `localhost` are the commands that will run for `localhost.conf`.
+
+```bash
+$ls /etc/icinga2/conf.d/hosts/localhost
+
+#OUTPUT
+apt.conf  disk.conf  http.conf  icinga.conf  load.conf  procs.conf  ssh.conf  swap.conf  users.conf
+```
+
+## Ping a 2nd Host and Additional Configurations
+
+Now is a good time to read through [Monitoring Basics](http://docs.icinga.org/icinga2/latest/doc/module/icinga2/chapter/monitoring-basics#monitoring-basics).
+
+Create a configuration file to monitor `srv1.example.com`, which is the NodeJS web server we setup in other examples. See the [Table of Contents](https://github.com/jpfluger/examples).
+
+```bash
+sudo vim /etc/icinga2/conf.d/hosts/svr1.conf
+```
+
+Add the following, changing ip and hostname information.
+
+```
+object Host "srv1.example.com" {
+  import "generic-host"
+  address = "192.168.1.2"
+  check_command = "hostalive"
+}
+
+object Service "ping4" {
+  import "generic-service"
+  host_name = "srv1.example.com"
+  check_command = "ping4"
+}
+
+object Service "http" {
+  import "generic-service"
+  host_name = "srv1.example.com"
+  check_command = "http"
+}
+```
+
+Check that configuration syntax is correct.
+
+```bash
+sudo service icinga2 checkconfig
+```
+
+If good, restart Icinga2 and refresh the web interface. 
+
+```bash
+sudo service icinga2 restart
+```
+
+---
 
 
-## Test
+In the web interface, you may see some entries have turned purple for `pending`. This status will change but when will it change? How to instruct a Host or Service how quickly it should get updated?
 
-Yes, the website is visible. But how to configure a host site? 
+Because our new objects inherit from `generic-host` and `generic-service`, we can see how the default update settings are defined in `templates.conf`.
 
-configure host (video??? nginx or domain specific)
+Open `templates.conf`.
 
+```bash
+sudo vim `/etc/icinga2/conf.d/templates.conf`
+```
 
-NEXT: config NPRE module
+Here's how my `generic-host` and `generic-server` templates appear. Notice the default properties to check and retry commands.
 
+```
+/**
+ * Provides default settings for hosts. By convention
+ * all hosts should import this template.
+ *
+ * The CheckCommand object `hostalive` is provided by
+ * the plugin check command templates.
+ * Check the documentation for details.
+ */
+template Host "generic-host" {
+  max_check_attempts = 5
+  check_interval = 1m
+  retry_interval = 30s
+
+  check_command = "hostalive"
+}
+
+/**
+ * Provides default settings for services. By convention
+ * all services should import this template.
+ */
+template Service "generic-service" {
+  max_check_attempts = 3
+  check_interval = 1m
+  retry_interval = 30s
+}
+```
+
+---
+
+Optionally group hosts together in some fashion, perhaps by domain-name. We can then view associated hosts or services by group name within Icinga-Web. 
+
+Open the group configuration file.
+
+```bash
+sudo vim /etc/icinga2/conf.d/groups.conf
+```
+
+Add your new `HostGroup` and the search criteria. In my example, `host.varsl.lan` is a custom property that gets auto-created. This means you don't need to define it anywhere else in order for it to be used by any configuration files.
+
+```
+object HostGroup "example-com" {
+  display_name = "example.com"
+
+  assign where host.vars.lan == "example.com"
+}
+
+> Note. Services can also be grouped together. That's what the `ServiceGroup` property is for. But in the example below, notice that we do not need to declare a special `ServiceGroup` for our service objects. This is because the service object is already associated with `object Host`; thus, no `vars.lan` property need reside within the individual `object Service` definition.
+
+Open the `svr1.conf` host configuration.
+
+```bash
+sudo vim /etc/icinga2/conf.d/hosts/svr1.conf
+```
+
+Associate the `Host` entry with `vars.lan`.
+
+```
+object Host "srv1.example.com" {
+  import "generic-host"
+  address = "192.168.1.2"
+  check_command = "hostalive"
+
+  vars.lan = "example.com"
+}
+
+object Service "ping4" {
+  import "generic-service"
+  host_name = "srv1.example.com"
+  check_command = "ping4"
+}
+
+object Service "http" {
+  import "generic-service"
+  host_name = "srv1.example.com"
+  check_command = "http"
+}
+```
+
+Check that configuration syntax is correct.
+
+```bash
+sudo service icinga2 checkconfig
+```
+
+Restart Icinga2.
+
+```bash
+sudo service icinga2 restart
+```
+
+Go to the web interface and refresh it. On the left navigation bar, click on `Host groups` and the `Hostgroups Tab` will appear. Click the icon left of the name, then click `Hosts` or `Services` to inspect them.
+
+## My Default Setup (for comparison)
+
+Here are the packages that were installed in this example.
+
+```bash
+sudo dpkg -l | grep icinga2
+
+#OUTPUT
+ii  icinga2                              2.1.1-1~ppa1~trusty1          amd64        host and network monitoring system
+ii  icinga2-bin                          2.1.1-1~ppa1~trusty1          amd64        host and network monitoring system - daemon
+ii  icinga2-common                       2.1.1-1~ppa1~trusty1          all          host and network monitoring system - common files
+ii  icinga2-doc                          2.1.1-1~ppa1~trusty1          all          host and network monitoring system - documentation
+ii  icinga2-ido-pgsql                    2.1.1-1~ppa1~trusty1          amd64        host and network monitoring system - PostgreSQL support
+ii  python-icinga2                       2.1.1-1~ppa1~trusty1          all          host and network monitoring system - Python module
+```
+
+Icinga-Web version 1.11.2 was installed from tarball.
+
+---
+
+Here's how the installer configured the Icinga2 `/etc/icinga2` directory:
+
+```bash
+$ ls /etc/icinga2
+
+#OUTPUT
+conf.d  constants.conf  features-available  features-enabled  icinga2.conf  pki  scripts  zones.conf  zones.d
+
+$ ls /etc/icinga2/conf.d
+
+#OUTPUT
+commands.conf  downtimes.conf  groups.conf  hosts  notifications.conf  services.conf  templates.conf  timeperiods.conf  users.conf
+
+$ ls /etc/icinga2/features-enabled/
+
+#OUTPUT
+checker.conf  mainlog.conf  notification.conf
+
+$ ls /etc/icinga2/features-available
+
+#OUTPUT
+api.conf  checker.conf  command.conf  compatlog.conf  debuglog.conf  graphite.conf  icingastatus.conf  livestatus.conf  mainlog.conf  notification.conf  perfdata.conf  statusdata.conf  syslog.conf
+```
+
+We can also jump into postgres and poke-around at the tables just created.
+
+```bash
+sudo -u postgres psql
+```
+
+Now list the databases. 
+
+```postgres
+postgres=# \list
+
+#OUTPUT
+                                   List of databases
+    Name    |   Owner    | Encoding |   Collate   |    Ctype    |   Access privileges   
+------------+------------+----------+-------------+-------------+-----------------------
+ icinga     | icinga     | UTF8     | en_US.UTF-8 | en_US.UTF-8 | 
+ icinga_web | icinga_web | UTF8     | en_US.UTF-8 | en_US.UTF-8 | 
+ postgres   | postgres   | UTF8     | en_US.UTF-8 | en_US.UTF-8 | 
+ template0  | postgres   | UTF8     | en_US.UTF-8 | en_US.UTF-8 | =c/postgres          +
+            |            |          |             |             | postgres=CTc/postgres
+ template1  | postgres   | UTF8     | en_US.UTF-8 | en_US.UTF-8 | =c/postgres          +
+            |            |          |             |             | postgres=CTc/postgres
+(5 rows)
+```
+
+A default Icinga user was created too.
+
+```postgres
+postgres=# \du
+
+#OUTPUT
+                              List of roles
+ Role name  |                   Attributes                   | Member of 
+------------+------------------------------------------------+-----------
+ icinga     |                                                | {}
+ icinga_web |                                                | {}
+ postgres   | Superuser, Create role, Create DB, Replication | {}
+```
+
+Switch to the database `icinga` or `icinga_web`.
+
+```postgres
+postgres=# \c icinga
+```
+
+List the tables that were auto-created.
+
+```postgres
+icinga-# \dl *.*
+```
+
+Quit from postgres with the `\q` command.
+
+```sql
+postgres=# \q
+```
