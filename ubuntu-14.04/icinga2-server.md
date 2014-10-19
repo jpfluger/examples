@@ -82,7 +82,7 @@ check_clamd    check_disk      check_flexlm    check_icmp       check_ircd      
 check_cluster  check_disk_smb  check_ftp       check_ide_smart  check_jabber        check_mailq  check_nagios       check_ntp_peer  check_pgsql     check_rpc    check_snmp       check_tcp    check_wave
 ```
 
-Other commands, such as `ping4`, are found in the Icinga Template Library (ITL). The `include` directory for ITL is in `/usr/share/icinga2/include/`. 
+Other commands, such as `ping4`, are found in the [Icinga Template Library](http://icinga2.readthedocs.org/en/latest/chapter-5.html) (ITL). The `include` directory for ITL is in `/usr/share/icinga2/include/`. 
 
 Here are some of the ITL commands provided by `command-plugins.conf`.
 

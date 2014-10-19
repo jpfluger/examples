@@ -12,14 +12,13 @@ Post-Install for a node-based web-server using nvm for node version management:
   4. [Start/Stop the node server using nvm and sysvinit](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/sysvinit-and-nvm.md)
   5. [Nginx proxying multiple node sites](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nginx-proxy.md)
   6. [Restart with monit](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/monit-restart.md)
-  7. In Progress... [Munin client](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/munin-client.md):
-  8. In Progress... [Nagios NRPE client](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nagios-npre-client.md)
+  7. In Progress... [Nagios NRPE client](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nagios-npre-client.md) (for Ubuntu 14.04 and Windows 8.1)
 
-Additional services
+Additional services:
 
   1. [Private NPM Registry with Sinopia](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/sinopia.md)
-  2. In Progress... [Munin central server using nginx](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/munin-server.md) (aggregates host node reports)
-  3. [Icinga2 central server using nginx and postgresql](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/icinga2-server.md)  (monitors targeted devices and/or aggregates host node Nagios notifications (NPRE))
+  2. [Icinga2 central server using nginx and postgresql](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/icinga2-server.md)  (monitors targeted devices and/or aggregates host node Nagios notifications (NPRE))
+  3. Future... [Graphing Performance Data with Icinga2 and Graphite](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/icinga2-graphite.md)
 
 ---
 

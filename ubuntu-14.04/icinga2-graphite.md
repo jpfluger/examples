@@ -1,5 +1,5 @@
 > Back to [Table of Contents](https://github.com/jpfluger/examples)
 
-# Munin central server using nginx
+# Graphing Performance Data with Icinga2 and Graphite
 
 
