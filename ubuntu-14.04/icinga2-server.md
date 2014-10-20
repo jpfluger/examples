@@ -2,16 +2,20 @@
 
 # Icinga2 central server using nginx and postgresql
 
-Let's be very clear. There are two components to monitoring. 
+Let's be very clear. There are components to monitoring. It's not difficult but can be confusing if not clearly communicated from the outset.
 
-* Central Server: we are using icinga 2 for the core and icinga web for the GUI (version 2 of the web interface is still under "heavy development")
-* Clients: Any server we want to monitor will be monitored in one of two ways:
-  1. The central server uses ping, http or other commands to execute against the targeted device. No modules are installed on the targeted device.
-  2. Install Nagios Remote Plugin Executor (NRPE) installed on the target server. NRPE will communicate with Icinga2.
+1. Central Server: we are using icinga 2 for the core and icinga web for the GUI (version 2 of the web interface is still under "heavy development")
+2. Clients: Any server we want to monitor will be monitored in one of two ways:
+   1. The central server uses ping, http or other commands to execute against the targeted device. No modules are installed on the targeted device.
+   2. Install a client module on the remote device, which can then communicate with Icinga2
+      * On Linux, install Nagios Remote Plugin Executor (NRPE) on the remote Linux device.
+      * On Windows, install NSClient++ on the remote Windows device.
 
-The examples below cover setting up the **Central Server** and monitoring from the Central Server outwards towards targeted host devices. For setting up **NPRE** to communicate with Icinga, see [this example](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nagios-npre-client.md).
+The examples below cover setting up the **Central Server** and monitoring from the Central Server outwards towards targeted host devices. For setting up [NPRE](http://exchange.nagios.org/directory/Addons/Monitoring-Agents/NRPE--2D-Nagios-Remote-Plugin-Executor/details) or [NSClient](http://www.nsclient.org/about/) to communicate with Icinga, see [this Ubuntu 14.04 example](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nagios-npre-client.md) or [this Windows 8.1 example](https://github.com/jpfluger/examples/blob/master/windows/nsclient-windows.md).
 
-They assume a core Ubuntu 14.04 installation with a fully-qualified-domain-name of 'icinga.example.com'. The server name should be configured in DNS and accessible via ssh.
+---
+
+The core server assumes a default Ubuntu 14.04 installation with a fully-qualified-domain-name of 'icinga.example.com'. The server name should be configured in DNS and accessible via ssh. For the example below, I used an IP of `192.168.1.3`.
 
 This example will be covering the following:
 
