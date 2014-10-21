@@ -2,24 +2,25 @@
 
 # Icinga2 central server using nginx and postgresql
 
-Let's be very clear. There are components to monitoring. It's not difficult but can be confusing if not clearly communicated from the outset.
+Let's be very clear about the multiple components needed for monitoring. It's not difficult but can be confusing if not clearly communicated from the outset.
 
-1. Central Server: we are using icinga 2 for the core and icinga web for the GUI (version 2 of the web interface is still under "heavy development")
-2. Clients: Any server we want to monitor will be monitored in one of two ways:
+1. Central Server: we are using Icinga2 for the core and Icinga-Web for the GUI (version 2 of the web interface is still under "heavy development")
+2. Clients: Any server we monitor will be monitored in one of two ways:
    1. The central server uses ping, http or other commands to execute against the targeted device. No modules are installed on the targeted device.
    2. Install a client module on the remote device, which can then communicate with Icinga2
       * On Linux, install Nagios Remote Plugin Executor (NRPE) on the remote Linux device.
-      * On Windows, install NSClient++ NPRE service on the remote Windows device.
+      * On Windows, install NSClient++'s NPRE service on the remote Windows device.
 
-The examples below cover setting up the **Central Server** and monitoring from the Central Server outwards towards targeted host devices. For setting up [NPRE](http://exchange.nagios.org/directory/Addons/Monitoring-Agents/NRPE--2D-Nagios-Remote-Plugin-Executor/details) or [NSClient](http://www.nsclient.org/about/) to communicate with Icinga, see [this Ubuntu 14.04 example](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nagios-npre-client.md) or [this Windows 8.1 example](https://github.com/jpfluger/examples/blob/master/windows/nsclient-windows.md).
+The examples below cover setting up the **Central Server** and monitoring from the Central Server outwards towards targeted host devices. For setting up [NPRE](http://exchange.nagios.org/directory/Addons/Monitoring-Agents/NRPE--2D-Nagios-Remote-Plugin-Executor/details) or [NSClient](http://www.nsclient.org/about/) to communicate with Icinga, see [the NPRE Ubuntu 14.04 example](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nagios-npre-client.md) or [the NSClient++ Windows 8.1 example](https://github.com/jpfluger/examples/blob/master/windows/nsclient-windows.md).
 
 ---
 
-The core server assumes a default Ubuntu 14.04 installation with a fully-qualified-domain-name of 'icinga.example.com'. The server name should be configured in DNS and accessible via ssh. For the example below, I used an IP of `192.168.1.3`.
+The core server assumes a default Ubuntu 14.04 installation with a fully-qualified-domain-name of 'icinga.example.com'. The server name should be configured in DNS and accessible via ssh. For the example below, I used an IP of 192.168.1.3.
 
 This example will be covering the following:
 
 * [Install Icinga2](#install-icinga2)
+* [Icinga2 Tweaks for Commands and Testing](#icinga2-tweaks-for-commands-and-testing)
 * [Install Postgresql and let Icinga2 use it for storage](#install-postgresql-and-let-icinga2-use-it-for-storage)
 * [Install Nginx, PHP and Postgres dependencies](#install-nginx-php-and-postgres-dependencies)
 * [Install Icinga-Web (not Icinga-Classic nor Icinga-Web2)](#install-icinga-web)
@@ -28,7 +29,7 @@ This example will be covering the following:
 * [Ping a 2nd Host and Additional Configurations](#ping-a-2nd-host-and-additional-configurations)
 * [My Default Setup (for comparison)](#my-default-setup-for-comparison)
 
-I chose Icinga instead of Nagios because I wanted to integrate with Postgres. Also the web-interface is slick and, since Icinga is a fork of Nagios, any plugins developed for Nagios will work in Icinga.
+I chose Icinga instead of Nagios because I wanted to integrate with Postgres. Also the web-interface is slick and, since Icinga is a fork of Nagios, plugins developed for Nagios work in Icinga.
 
 > Note: The examples were compiled chiefly from these sources: [Icinga 2 Getting Started Documentation](http://docs.icinga.org/icinga2/latest/doc/module/icinga2/chapter/getting-started#installing-requirements) and GitHub [Install Readme](https://github.com/Icinga/icinga-web/blob/master/doc/INSTALL) for Icinga-Web.
 
@@ -37,12 +38,12 @@ I chose Icinga instead of Nagios because I wanted to integrate with Postgres. Al
 Let's install the Icinga `ppa` on Ubuntu 14.04.
 
 ```bash
-sudo add-apt-repository ppa:formorer/icinga
-sudo apt-get update
-sudo apt-get install icinga2
+$ sudo add-apt-repository ppa:formorer/icinga
+$ sudo apt-get update
+$ sudo apt-get install icinga2
 ```
 
-Verify the install via the enable-feature command `icinga2-enable-feature`.
+Verify the install via the enable-feature command `icinga2-enable-feature`. 
 
 ```bash
 $ icinga2-enable-feature
@@ -56,10 +57,12 @@ Available features: api checker command compatlog debuglog graphite icingastatus
 Enabled features: checker mainlog notification 
 ```
 
-During the setup, the installer created the `nagios` user and group. This is the default setting in Debian/Ubuntu distributions. It also installed plugins. Remember, Icinga is a fork of Nagios and uses Nagios plugins. On an Debian/Ubuntu system, these are found here:
+> Note: `icinga2-enable-feature <NAME-OF-FEATURER>` will enable a feature and `icinga2-disable-feature <NAME-OF-FEATURER>` will disable a feature. An icinga2 restart is required after enabling or disabling features.
+
+During setup, the installer created the `nagios` user and group. This is the default setting in Debian/Ubuntu distributions. It also installed plugins. Remember that Icinga is a fork of Nagios and uses Nagios plugins. On an Debian/Ubuntu system, these are found here:
 
 ```bash
-ls /usr/lib/nagios/plugins
+$ ls /usr/lib/nagios/plugins
 
 #OUTPUT
 check_apt     check_cluster  check_dummy     check_host  check_ide_smart  check_jabber  check_mrtg      check_nntp   check_ntp       check_nwstat  check_pop    check_rta_multi  check_smtp  check_ssmtp  check_time  check_users  utils.pm
@@ -70,13 +73,13 @@ check_clamd   check_disk     check_ftp       check_icmp  check_ircd       check_
 More plugins are available via [The Monitoring Plugins](https://www.monitoring-plugins.org/) project, for which an ubuntu package can install them:
 
 ```bash
-sudo apt-get install nagios-plugins
+$ sudo apt-get install nagios-plugins
 ```
 
 Refresh the plugins list.
 
-```basg
-ls /usr/lib/nagios/plugins
+```bash
+$ ls /usr/lib/nagios/plugins
 
 #OUTPUT
 check_apt      check_dbi       check_dns       check_host       check_ifoperstatus  check_ldap   check_mrtg         check_nntp      check_ntp_time  check_ping   check_rta_multi  check_spop   check_time   negate
@@ -91,7 +94,7 @@ Other commands, such as `ping4`, are found in the [Icinga Template Library](http
 Here are some of the ITL commands provided by `command-plugins.conf`.
 
 ```bash
- sudo cat /usr/share/icinga2/include/command-plugins.conf | grep CheckCommand
+$ sudo cat /usr/share/icinga2/include/command-plugins.conf | grep CheckCommand
 
  #OUTPUT
 template CheckCommand "ping-common" {
@@ -139,22 +142,97 @@ A template is reusable. In the output above, `ping4` and `ping6` inherit from `p
 
 ---
 
-Creating your own plugins.
-
 Icinga2 offers suggestions on what you need to do to design your own plugin. See the [Icinga 2 Getting Started Documentation](http://docs.icinga.org/icinga2/latest/doc/module/icinga2/chapter/getting-started#installing-requirements) for integrating additional plugins.
+
+## Icinga2 Tweaks for Commands and Testing
+
+Let's test the installation so far.
+
+```bash
+$ sudo -u nagios /usr/lib/nagios/plugins/check_ping -4 -H 127.0.0.1 -c 5000,100% -w 3000,80%
+
+#OUTPUT
+PING OK - Packet loss = 0%, RTA = 0.06 ms|rta=0.063000ms;3000.000000;5000.000000;0.000000 pl=0%;80;100;0
+```
+
+Add the `nagios` user to the `www-data` group.
+
+```bash
+$ sudo usermod -a -G nagios www-data
+```
+
+Let's enable the `command` feature.
+
+```bash
+$ sudo icinga2-enable-feature command
+$ sudo service icinga2 restart
+```
+
+Check that we can pipe a command to Icinga2. This is how the Icinga-Web interface will pass instructions to Icinga2.
+
+```bash
+ $ /bin/echo "[`date +%s`] SCHEDULE_FORCED_SVC_CHECK;localhost;ping4;`date +%s`" >> /var/run/icinga2/cmd/icinga2.cmd
+-bash: /var/run/icinga2/cmd/icinga2.cmd: Permission denied
+```
+
+Did that work for you?  No?  It didn't work for me either. Here is a total work-around hack until a cleaner fix is found.
+
+Open up the Icinga2 SysVInit file.
+
+```bash
+$ sudo vim /etc/init.d/icinga2
+```
+
+Edit line 52 to look like this:
+
+```
+chown "$DAEMON_USER":"$DAEMON_CMDGROUP" /var/run/icinga2/cmd
+#chmod 2710 /var/run/icinga2/cmd
+chmod 2777 /var/run/icinga2/cmd
+```
+
+At line 79, at the end of function do_start(), add this:
+
+```
+chmod 777 /var/run/icinga2/cmd/icinga2.cmd
+```
+
+Restart icinga2.
+
+```bash
+$ sudo service icinga2 restart
+```
+
+Rerun the forced check command.
+
+```bash
+ $ /bin/echo "[`date +%s`] SCHEDULE_FORCED_SVC_CHECK;localhost;ping4;`date +%s`" >> /var/run/icinga2/cmd/icinga2.cmd
+ ```
+
+No errors returned, right?  Let's check the log.
+
+```
+$ sudo tail -n 4 /var/log/icinga2/icinga2.log
+[2014-10-21 14:54:42 -0500] information/Application: Shutting down Icinga...
+[2014-10-21 14:54:42 -0500] information/CheckerComponent: Checker stopped.
+[2014-10-21 14:54:48 -0500] information/ConfigItem: Activated all objects.
+[2014-10-21 14:57:15 -0500] information/ExternalCommandListener: Executing external command: [1413921435] SCHEDULE_FORCED_SVC_CHECK;localhost;ping4;1413921435
+```
+
+Looks like the command queued just fine.
 
 ## Install Postgresql and let Icinga2 use it for storage
 
 Install postgresql.
 
 ```bash
-sudo apt-get install postgresql
+$ sudo apt-get install postgresql
 ```
 
 Install the icinga2 module that communicates with postgresql.
 
 ```bash
-sudo apt-get install icinga2-ido-pgsql
+$ sudo apt-get install icinga2-ido-pgsql
 
 # WIZARD 1 --> Choose YES
 # WIZARD 2 --> Choose NO (we'll set this manually)
@@ -163,7 +241,7 @@ sudo apt-get install icinga2-ido-pgsql
 Login to postgres.
 
 ```bash
-sudo -u postgres psql
+$ sudo -u postgres psql
 ```
 
 The postgres `root` user password is not set by default. Let's fix that. While still logged into postgres, type:
@@ -183,16 +261,16 @@ postgres=# \q
 Create the role for the icinga2 user. For the example, I made both role and password the same, `"icinga"`.
 
 ```bash
-sudo -u postgres psql -c "CREATE ROLE icinga WITH LOGIN PASSWORD 'icinga'";
-sudo -u postgres createdb -O icinga -E UTF8 icinga
+$ sudo -u postgres psql -c "CREATE ROLE icinga WITH LOGIN PASSWORD 'icinga'";
+$ sudo -u postgres createdb -O icinga -E UTF8 icinga
 ```
 
 ---
 
-Add the icinga user with md5 authentication to `pg_hba.conf`.
+Add the icinga user with md5 authentication to `pg_hba.conf`. The asterisk (*) takes place of "9.3", which is the version of postgres installed on my machine. If multiple versions of Postgres are installed, change the asterisk to the desired version.
 
 ```bash
-sudo vim /etc/postgresql/*/main/pg_hba.conf
+$ sudo vim /etc/postgresql/*/main/pg_hba.conf
 ```
 
 Slip in the non-local connections for `icinga` between "Put your actual configurations here" and "DO NOT DISABLE!".
@@ -221,7 +299,7 @@ host    icinga      icinga      ::1/128               md5
 Restart postgres.
 
 ```bash
-sudo service postgresql restart
+$ sudo service postgresql restart
 ```
 
 ---
@@ -229,13 +307,13 @@ sudo service postgresql restart
 Import into the `icinga` database the schema found in `/usr/share/icinga2-ido-pgsql/schema`.
 
 ```bash 
-psql -U icinga -d icinga < /usr/share/icinga2-ido-pgsql/schema/pgsql.sql 
+$ psql -U icinga -d icinga < /usr/share/icinga2-ido-pgsql/schema/pgsql.sql
 ```
 
 Update ido-pgsql.conf.
 
 ```bash
-sudo vim /etc/icinga2/features-available/ido-pgsql.conf 
+$ sudo vim /etc/icinga2/features-available/ido-pgsql.conf 
 ```
 
 Input the database credentials for `icinga`.
@@ -256,22 +334,22 @@ object IdoPgsqlConnection "ido-pgsql" {
 }
 ```
 
-Enable the `ido-pgsql` modules.
+Enable the `ido-pgsql` modules because the install wizard **did not** do it for me.
 
 ```bash
-sudo icinga2-enable-feature ido-pgsql
+$ sudo icinga2-enable-feature ido-pgsql
 ```
 
 Since we are enabling features, let's also add `command`. This allows an external command pipe be accessible for web interfaces and Icinga addons to communicate with Icinga2.
 
 ```bash
-sudo icinga2-enable-feature command
+$ sudo icinga2-enable-feature command
 ```
 
 Restart icinga2.
 
 ```bash
-sudo service icinga2 restart
+$ sudo service icinga2 restart
 ```
 
 ## Install Nginx, PHP and Postgres dependencies
@@ -279,7 +357,7 @@ sudo service icinga2 restart
 Install nginx, php and postgres dependencies.
 
 ```bash
-sudo apt-get install nginx php5-fpm php-apc php5-pgsql php5-cli php-pear php5-xmlrpc php5-xsl php-soap php5-gd php5-ldap php5-json
+$ sudo apt-get install nginx php5-fpm php-apc php5-pgsql php5-cli php-pear php5-xmlrpc php5-xsl php-soap php5-gd php5-ldap php5-json
 ```
 
 By default nginx launches a web page that can now be accessed by your client browser. Assuming you have DNS pointed to `icinga.example.com`, bring up in a web browser:
@@ -290,13 +368,32 @@ http://icinga.example.com
 
 A little maintenance. Follow [this guide](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nginx-proxy.md) to setup nginx as a proxy but feel free to leave out the `myapp` configuration.
 
+---
+
+Create the `test-php` root directory and open `index.php` in an editor. For this example, I'm using `/var/www/test-php` as the root web server folder.
+
+```bash
+$ sudo mkdir -p /var/www/test-php
+$ sudo vim /var/www/test-php/index.php
+```
+
+Paste this into `index.php`.
+
+```php
+<?php
+  phpinfo( );
+?>
+```
+
+---
+
 Let's create a new nginx site that will test our php installation. 
 
 ```bash
-sudo vim /etc/nginx/sites-available/test-php
+$ sudo vim /etc/nginx/sites-available/test-php
 ```
 
-Enter the following. We'll create the root directory for `test-php` and the user-password file after this step.
+Enter the following. Change `server_name` and the log file names, as necessary. No need for a user-password becuase we'll disable this site after validating php.info() is correct.
 
 ```nginx
 #VERSION: "test-php"
@@ -305,7 +402,7 @@ server {
    server_name icinga.example.com;
    access_log  /var/log/nginx/icinga.example.com.access.log  main;
    error_log   /var/log/nginx/icinga.example.com.error.log;
-   root        /path/to/root/folder/test-php;
+   root        /var/www/test-php;
    index       index.php;
 
    location ~ \.php$ {
@@ -320,21 +417,21 @@ server {
 
 ---
 
-Change the default timezone, else Icinga-Web will GMT.
+Change the default timezone for php, else Icinga-Web will show GMT.
 
 What does `cat /etc/timezone` return?
 
 ```bash
-cat /etc/timezone 
+$ cat /etc/timezone
 
 #OUTPUT
-America/Chicago
+US/Central
 ```
 
 Change `php.ini`.
 
 ```bash
-sudo vim /etc/php5/fpm/php.ini
+$ sudo vim /etc/php5/fpm/php.ini
 ```
 
 Find `timezone` and comment it in.
@@ -343,30 +440,13 @@ Find `timezone` and comment it in.
 [Date]
 ; Defines the default timezone used by the date functions
 ; http://php.net/date.timezone
-date.timezone = America/Chicago
+date.timezone = US/Central
 ```
 
 Restart php services.
 
 ```bash
-sudo service php5-fpm restart
-```
-
----
-
-Create the `test-php` root directory and open `index.php` in an editor.
-
-```bash
-sudo mkdir -p /var/wwww/test-php
-sudo vim /var/www/test-php/index.php
-```
-
-Paste this into `index.php`.
-
-```php
-<?php
-  phpinfo( );
-?>
+$ sudo service php5-fpm restart
 ```
 
 ---
@@ -374,22 +454,22 @@ Paste this into `index.php`.
 Disable the `default` nginx site.
 
 ```bash
-sudo nginx_modsite -d default
+$ sudo nginx_modsite -d default
 ```
 
 Enable `test-php`.
 
 ```bash
-sudo nginx_modsite -e test-php
+$ sudo nginx_modsite -e test-php
 ```
 
 Restart nginx.
 
 ```bash
-sudo service nginx restart
+$ sudo service nginx restart
 ```
 
-Reload your browser. You should now see the information passed back from `phpinfo()`.
+Reload your browser. You should now see the information passed back from `phpinfo()`.  Timezone should be set to `US/Central`.
 
 ```
 http://icinga.example.com
@@ -399,38 +479,38 @@ http://icinga.example.com
 
 We are going to install Icinga-Web, which is not Icinga-Classic nor Icinga-Web2. Icinga-Web is compatible with both Icinga and Icinga2 modules. Many of the Debian/Ubuntu-related tutorials on the internet are for Icinga-Classic. This example is not Icinga-Classic; it is for Icinga-Web, which is Icinga's current "flagship" interface. Please see [this page](https://www.icinga.org/icinga/screenshots/) to begin investigating differences.
 
-In order to get Icinga-Web to better behave with nginx commands to rewrite and alias files, we are going build and install Icinga-Web in one site and then point the Nginx website to it. When finished, it will look like this:
+In order to get Icinga-Web to behave with nginx, we are going build and install Icinga-Web in one site and then point the Nginx website to it. When finished, it will look like this:
 
-* ~/icinga-web: This is the unpackaged source file or clone from GitHub. We configure the installation here. `make` will install the installation to a folder we specify.
-* ~/prod/icinga-web: This is the directory in which `make` will install icinga-web. If we were running Apache, an Apache configuration file would have already been pre-generated and would point to this directory. But we are using Nginx, so add a 3rd directory which will symlink back to this one.
-* /var/www/icinga: This is the root of the Nginx directory that gets symlinked back to icinga-web. 
+* ~/icinga-web-1.11.2: This is the unpackaged source file or clone from GitHub. We configure the installation here. `make` will install the installation to a folder we specify.
+* /usr/share/icinga-web: This is the directory in which `make` will install icinga-web. If we were running Apache, an Apache configuration file would have already been pre-generated and would point to this directory. But we are using Nginx, so add a 3rd directory which will symlink back to this one.
+* /var/www/icinga: This is the root of the Nginx directory that gets symlinked back to /usr/share/icinga-web. 
 
 This example uses release v1.11.2. See [this website](https://github.com/Icinga/icinga-web/releases) for the latest production releases.
 
 Download using `wget`.
 
 ```bash
-cd ~/
-wget https://github.com/Icinga/icinga-web/releases/download/v1.11.2/icinga-web-1.11.2.tar.gz
+$ cd ~/
+$ wget https://github.com/Icinga/icinga-web/releases/download/v1.11.2/icinga-web-1.11.2.tar.gz
 ```
 
 Extract.
 
 ```bash
-tar xzvf icinga-web-1.11.2.tar.gz
+$ tar xzvf icinga-web-1.11.2.tar.gz
 ```
 
 Create the production directory for this website. 
 
 ```bash
-mkdir -p ~/prod/icinga-web
+$ sudo mkdir -p /usr/share/icinga-web
 ```
 
-Dive into postgres and create the icinga_web role and database.  Change the default PASSWORD of `icinga_web` to something more secure.
+In postgres create the icinga_web role and database.  Change the default PASSWORD of `icinga_web` to something more secure.
 
 ```
-sudo -u postgres psql -c "CREATE ROLE icinga_web WITH LOGIN PASSWORD 'icinga_web'";
-sudo -u postgres createdb -O icinga_web -E UTF8 icinga_web
+$ sudo -u postgres psql -c "CREATE ROLE icinga_web WITH LOGIN PASSWORD 'icinga_web'";
+$ sudo -u postgres createdb -O icinga_web -E UTF8 icinga_web
 ```
 
 Give the user `icinga_web` trusted authentication rights to start-stop postgresql by adding the following  to `pg_hba.conf`.
@@ -438,10 +518,10 @@ Give the user `icinga_web` trusted authentication rights to start-stop postgresq
 First open the file.
 
 ```bash
-sudo vim /etc/postgresql/9.3/main/pg_hba.conf
+$ sudo vim /etc/postgresql/9.3/main/pg_hba.conf
 ```
 
-Just after the `icinga` entries added earlier, include:
+Just after the `icinga` entries added above, include:
 
 ```
 #icinga_web
@@ -453,26 +533,26 @@ host    icinga_web      icinga_web      ::1/128               trust
 Restart postgresql.
 
 ```bash
-sudo service postgresql restart
+$ sudo service postgresql restart
 ```
 
-Let's change into folder of the tarball we just extracted.
+Change into folder of the tarball we just extracted.
 
 ```bash
-cd icinga-web-1.11.2/
+$ cd icinga-web-1.11.2/
 ```
 
 Create the icinga_web database objects by importing them in from the existing schema file.  
 
 ```bash
-psql -U icinga_web -d icinga_web < etc/schema/pgsql.sql 
+$ psql -U icinga_web -d icinga_web < etc/schema/pgsql.sql 
 ```
 
-Configure the site. You will need to replace `/PATH/TO/PROD/DIRECTORY/icinga-web` with your mapping. For example, `/PATH/TO/PROD/DIRECTORY/icinga-web` would be mapped to `~/prod/icinga-web`. 
+Configure the site. The target directory is defined by `--prefix`, where we direct it to install to `/usr/share/icinga-web`. 
 
 ```
-./configure \
-          --prefix=/PATH/TO/PROD/DIRECTORY/icinga-web \
+$ ./configure \
+          --prefix=/usr/share/icinga-web \
           --with-web-user=www-data \
           --with-web-group=www-data \
           --with-web-path=/icinga-web \
@@ -498,16 +578,16 @@ Please proceed with make to install your icinga-web instance:
                       keep site config files untouched!
 ```
 
-We need make installed before we can `make install`.
+We need `make` installed before we can `make install`.
 
 ```bash
-sudo apt-get install make
+$ sudo apt-get install make
 ```
 
 Install it.
 
 ```bash
-sudo make install
+$ sudo make install
 
 #END OF OUTPUT
 Installation if icinga-web succeeded.
@@ -528,10 +608,10 @@ Have fun!
 Test php dependencies.
 
 ```bash
-sudo make testdeps
+$ sudo make testdeps
 
 #END OF OUTPUT
-All over result: PASS (required 12/12, optional 9/11, all 21/23, time 0.01s)
+All over result: PASS (required 12/12, optional 9/11, all 21/23, time 0.00s)
 
 Exit (status=0)
 ```
@@ -543,10 +623,10 @@ Exit (status=0)
 Create a new nginx site for `icinga.example.com`. 
 
 ```bash
-sudo vim /etc/nginx/sites-available/icinga.example.com
+$ sudo vim /etc/nginx/sites-available/icinga.example.com
 ```
 
-Copy the following into the editor. In three places, you will need to replace `/PATH/TO/PROD/DIRECTORY/icinga-web` with your mapping. For example, `/PATH/TO/PROD/DIRECTORY/icinga-web` would be mapped to `~/prod/icinga-web`. 
+Copy the following into the editor. 
 
 ```nginx
 #VERSION: "icinga.example.com"
@@ -563,11 +643,11 @@ server {
         }
 
         location /icinga-web/modules/([A-Za-z0-9]*)/resources/images/([A-Za-z_\-0-9]*\.(png|gif|jpg))$ {
-                alias /PATH/TO/PROD/DIRECTORY/icinga-web/app/modules/$1/pub/images/$2;
+                alias /usr/share/icinga-web/app/modules/$1/pub/images/$2;
         }
 
         location /icinga-web/modules/([A-Za-z0-9]*)/resources/styles/([A-Za-z0-9]*\.css)$ {
-                alias /PATH/TO/PROD/DIRECTORY/icinga-web/app/modules/$1/pub/styles/$2;
+                alias /usr/share/icinga-web/app/modules/$1/pub/styles/$2;
         }
 
         location /icinga-web/modules {
@@ -588,62 +668,45 @@ server {
                 fastcgi_index index.php;
                 fastcgi_split_path_info ^(/icinga-web/.*\.php)(.*);
                 fastcgi_param PATH_INFO $fastcgi_path_info;
-                fastcgi_param SCRIPT_FILENAME /PATH/TO/PROD/DIRECTORY/icinga-web/pub/index.php;
+                fastcgi_param SCRIPT_FILENAME /usr/share/icinga-web/pub/index.php;
         }
 }
 ```
 
 > Note: `listen` is set to `0.0.0.0:80`, which directs nginx to listen on all ip addresses on port 80. This is important as Icinga2's default localhost configuration for `http` has `localhost` as its `hostname`.
 
-Create a symlink from the `lib` folder to the javascript folder inside`/PATH/TO/PROD/DIRECTORY`.
+Create a symlink from the `lib` folder so that it appears as the `js` directory within `/usr/share/icinga-web/pub`.
 
 ```bash
-sudo ln -s /PATH/TO/PROD/DIRECTORY/icinga-web/lib /PATH/TO/PROD/DIRECTORY/icinga-web/pub/js
+$ sudo ln -s /usr/share/icinga-web/lib /usr/share/icinga-web/pub/js
 ```
 
 Create the root web folder that nginx is pointed at.
 
 ```bash
-sudo mkdir -p /var/www/icinga
-```
-
-Create a symlink from the nginx root to the `published` production web folder.
-
-```bash
-sudo ln -s /PATH/TO/PROD/DIRECTORY/icinga-web/pub /var/www/icinga/icinga-web
+$ sudo mkdir -p /var/www/icinga
 ```
 
 Change permissions.
 
 ```bash
-sudo chown -R www-data:www-data /var/www/icinga/icinga-web
-sudo chown -R www-data:www-data /PATH/TO/PROD/DIRECTORY/icinga-web
+$ sudo chown -R www-data:www-data /var/www/icinga/icinga-web
+$ sudo chown -R www-data:www-data /usr/share/icinga-web
 ```
 
-Disable `test-php`.
+Create a symlink from the nginx root to so that it appears as `icinga-web` under the published production web folder, `/var/www/icinga`.
 
 ```bash
-sudo nginx_modsite -d test-php
-```
-
-Enable `test-php`.
-
-```bash
-sudo nginx_modsite -e icinga.example.com
-```
-
-Restart nginx.
-
-```bash
-sudo service nginx restart
+$ sudo ln -s /usr/share/icinga-web/pub /var/www/icinga/icinga-web
 ```
 
 ---
 
+
 Change the `icinga-pipe` entry in `access.xml`.
 
 ```bash
-sudo vim ~/prod/icinga-web/app/modules/Api/config/access.xml
+$ sudo vim /usr/share/icinga-web/app/modules/Api/config/access.xml
 ```
 
 Change the path to `/var/run/icinga2/cmd/icinga2.cmd`.
@@ -657,27 +720,36 @@ Change the path to `/var/run/icinga2/cmd/icinga2.cmd`.
 </write>
  ```
 
-Add the `nagios` user to the `www-data` group.
-
-```bash
-sudo usermod -a -G nagios www-data
-```
-
 Clear the web-cache. Do this anytime modifications have been made to web config files.
 
 ```bash
-sudo ~/prod/icinga-web/bin/clearcache.sh 
-```
-
-As well as restarting php5-fpm.
-
-```bash
-sudo service php5-fpm restart
+$ sudo /usr/share/icinga-web/bin/clearcache.sh
 ```
 
 ---
 
-Refresh your web-browser that points to `icinga.example.com`. You will be redirected to the following:
+Disable `test-php`.
+
+```bash
+$ sudo nginx_modsite -d test-php
+```
+
+Enable `icinga.example.com`.
+
+```bash
+$ sudo nginx_modsite -e icinga.example.com
+```
+
+Restart php and nginx.
+
+```bash
+$ sudo service php5-fpm restart
+$ sudo service nginx restart
+```
+
+---
+
+Refresh your web-browser that points to `icinga.example.com`. (I refreshed twice my browser twice before I was redirected correctly.) You will be redirected to the following:
 
 ```
 http://icinga.example.com/icinga-web/
@@ -706,7 +778,7 @@ As mentioned earlier, plugin commands were installed into `/usr/lib/nagios/plugi
 View help for a command by passing the targeted command the `-h` parameter.
 
 ```bash
-sudo /usr/lib/nagios/plugins/check_http -h | less
+$ sudo /usr/lib/nagios/plugins/check_http -h | less
 ```
 
 Run a command, passing it arguments.
@@ -727,7 +799,7 @@ HTTP CRITICAL - Unable to open TCP socket
 Icinga2 global configurations start in `/etc/icinga2/conf.d/` and narrow down to specific devices.
 
 ```bash
-$ls /etc/icinga2/conf.d/
+$ ls /etc/icinga2/conf.d/
 
 #OUTPUT
 commands.conf  downtimes.conf  groups.conf  hosts  notifications.conf  services.conf  templates.conf  timeperiods.conf  users.conf
@@ -736,7 +808,7 @@ commands.conf  downtimes.conf  groups.conf  hosts  notifications.conf  services.
 Look in hosts. This is where you put your local and target device configurations.
 
 ```bash
-$ls /etc/icinga2/conf.d/hosts
+$ ls /etc/icinga2/conf.d/hosts
 
 #OUTPUT
 localhost  localhost.conf
@@ -745,7 +817,7 @@ localhost  localhost.conf
 Inside `localhost` are the commands that will run for `localhost.conf`.
 
 ```bash
-$ls /etc/icinga2/conf.d/hosts/localhost
+$ ls /etc/icinga2/conf.d/hosts/localhost
 
 #OUTPUT
 apt.conf  disk.conf  http.conf  icinga.conf  load.conf  procs.conf  ssh.conf  swap.conf  users.conf
@@ -758,7 +830,7 @@ Now is a good time to read through [Monitoring Basics](http://docs.icinga.org/ic
 Create a configuration file to monitor `srv1.example.com`, which is the NodeJS web server we setup in other examples (e.g. refer to [Table of Contents](https://github.com/jpfluger/examples)).
 
 ```bash
-sudo vim /etc/icinga2/conf.d/hosts/svr1.conf
+$ sudo vim /etc/icinga2/conf.d/hosts/svr1.conf
 ```
 
 Add the following, changing ip and hostname information.
@@ -786,13 +858,13 @@ object Service "http" {
 Check that configuration syntax is correct.
 
 ```bash
-sudo service icinga2 checkconfig
+$ sudo service icinga2 checkconfig
 ```
 
 If good, restart Icinga2 and refresh the web interface. 
 
 ```bash
-sudo service icinga2 restart
+$ sudo service icinga2 restart
 ```
 
 ---
@@ -805,7 +877,7 @@ Because our new objects inherit from `generic-host` and `generic-service`, we ca
 Open `templates.conf`.
 
 ```bash
-sudo vim `/etc/icinga2/conf.d/templates.conf`
+$ sudo vim `/etc/icinga2/conf.d/templates.conf`
 ```
 
 Here's how my `generic-host` and `generic-server` templates appear. Notice the default properties to check and retry commands.
@@ -845,7 +917,7 @@ Optionally group hosts together in some fashion, perhaps by domain-name. We can 
 Open the group configuration file.
 
 ```bash
-sudo vim /etc/icinga2/conf.d/groups.conf
+$ sudo vim /etc/icinga2/conf.d/groups.conf
 ```
 
 Add your new `HostGroup` and the search criteria. In my example, `host.varsl.lan` is a custom property that gets auto-created. This means you don't need to define it anywhere else in order for it to be used by any configuration files.
@@ -862,7 +934,7 @@ object HostGroup "example-com" {
 Open the `svr1.conf` host configuration.
 
 ```bash
-sudo vim /etc/icinga2/conf.d/hosts/svr1.conf
+$ sudo vim /etc/icinga2/conf.d/hosts/svr1.conf
 ```
 
 Associate the `Host` entry with `vars.lan`.
@@ -892,16 +964,18 @@ object Service "http" {
 Check that configuration syntax is correct.
 
 ```bash
-sudo service icinga2 checkconfig
+$ sudo service icinga2 checkconfig
 ```
 
 Restart Icinga2.
 
 ```bash
-sudo service icinga2 restart
+$ sudo service icinga2 restart
 ```
 
 Go to the web interface and refresh it. On the left navigation bar, click on `Host groups` and the `Hostgroups Tab` will appear. Click the icon left of the name, then click `Hosts` or `Services` to inspect them.
+
+A visual overview if Icinga-Web [can be found here](http://docs.icinga.org/latest/en/icinga-web-introduction.html).
 
 ## My Default Setup (for comparison)
 
@@ -950,7 +1024,7 @@ api.conf  checker.conf  command.conf  compatlog.conf  debuglog.conf  graphite.co
 We can also jump into postgres and poke-around at the tables just created.
 
 ```bash
-sudo -u postgres psql
+$ sudo -u postgres psql
 ```
 
 Now list the databases. 

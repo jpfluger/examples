@@ -18,9 +18,7 @@ Open the default nginx configuration file.
 sudo vim /etc/nginx/nginx.conf
 ```
 
-Compare to the [nginx.conf](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nginx/nginx.conf) posted in my examples.
-
-Tweak the `Logging Settings` entry. 
+Compare to the [nginx.conf](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nginx/nginx.conf) posted in my examples. I tweaked the `Logging Settings` entry. 
 
 ```nginx
 ##
