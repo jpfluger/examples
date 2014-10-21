@@ -9,7 +9,7 @@ Let's be very clear. There are components to monitoring. It's not difficult but 
    1. The central server uses ping, http or other commands to execute against the targeted device. No modules are installed on the targeted device.
    2. Install a client module on the remote device, which can then communicate with Icinga2
       * On Linux, install Nagios Remote Plugin Executor (NRPE) on the remote Linux device.
-      * On Windows, install NSClient++ on the remote Windows device.
+      * On Windows, install NSClient++ NPRE service on the remote Windows device.
 
 The examples below cover setting up the **Central Server** and monitoring from the Central Server outwards towards targeted host devices. For setting up [NPRE](http://exchange.nagios.org/directory/Addons/Monitoring-Agents/NRPE--2D-Nagios-Remote-Plugin-Executor/details) or [NSClient](http://www.nsclient.org/about/) to communicate with Icinga, see [this Ubuntu 14.04 example](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nagios-npre-client.md) or [this Windows 8.1 example](https://github.com/jpfluger/examples/blob/master/windows/nsclient-windows.md).
 
@@ -636,6 +636,43 @@ Restart nginx.
 
 ```bash
 sudo service nginx restart
+```
+
+---
+
+Change the `icinga-pipe` entry in `access.xml`.
+
+```bash
+sudo vim ~/prod/icinga-web/app/modules/Api/config/access.xml
+```
+
+Change the path to `/var/run/icinga2/cmd/icinga2.cmd`.
+
+```xml
+<!-- allowed to be written to -->
+<write>
+    <files>
+         <resource name="icinga_pipe">/var/run/icinga2/cmd/icinga2.cmd</resource>
+    </files>
+</write>
+ ```
+
+Add the `nagios` user to the `www-data` group.
+
+```bash
+sudo usermod -a -G nagios www-data
+```
+
+Clear the web-cache. Do this anytime modifications have been made to web config files.
+
+```bash
+sudo ~/prod/icinga-web/bin/clearcache.sh 
+```
+
+As well as restarting php5-fpm.
+
+```bash
+sudo service php5-fpm restart
 ```
 
 ---

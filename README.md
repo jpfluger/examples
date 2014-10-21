@@ -22,7 +22,9 @@ Additional services:
 
 ## Windows
 
-  1. In Progress... [NSClient++](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nagios-npre-client.md) (for Windows 8.1) to communicate with Nagios/Icinga2
+  1. [NSClient++](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nagios-npre-client.md) (for Windows 8.1) to communicate with Nagios/Icinga2
+     * It should run on all versions of MS Windows
+     * It can run on Linux too but pre-compiled binaries are currently unavailable
 
 
 ---

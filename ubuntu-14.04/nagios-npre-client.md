@@ -9,7 +9,7 @@ Let's be very clear. There are components to monitoring. It's not difficult but 
    1. The central server uses ping, http or other commands to execute against the targeted device. No modules are installed on the targeted device.
    2. Install a client module on the remote device, which can then communicate with Icinga2
       * On Linux, install Nagios Remote Plugin Executor (NRPE) on the remote Linux device.
-      * On Windows, install NSClient++ on the remote Windows device.
+      * On Windows, install NSClient++ NPRE service on the remote Windows device.
 
 The example below covers setting up [NPRE](http://exchange.nagios.org/directory/Addons/Monitoring-Agents/NRPE--2D-Nagios-Remote-Plugin-Executor/details) on Ubuntu 14.04. For help on installing [NSClient++](http://www.nsclient.org/about/) on Windows see [this Windows 8.1 example](https://github.com/jpfluger/examples/blob/master/windows/nsclient-windows.md).
 
@@ -82,7 +82,7 @@ DISK OK - free space: / 12628 MB (73% inode=81%);| /=4448MB;14410;16211;0;18013
 avatar@ub14-henry:~$ sudo vim /etc/nagios/nrpe.cfg
 ```
 
----
+## Icinga2 Central Server
 
 Back on the Icinga2 Central Server, we need to install the Nagios `check_nrpe` plugin. Using `--no-install-recommends` installs the plugin only and not the extra nagios3-related libraries.
 
