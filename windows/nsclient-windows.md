@@ -9,9 +9,9 @@ Let's be very clear. There are components to monitoring. It's not difficult but 
    1. The central server uses ping, http or other commands to execute against the targeted device. No modules are installed on the targeted device.
    2. Install a client module on the remote device, which can then communicate with Icinga2
       * On Linux, install Nagios Remote Plugin Executor (NRPE) on the remote Linux device.
-      * On Windows, install NSClient++ NPRE service on the remote Windows device.
+      * On Windows, install NSClient++ NRPE service on the remote Windows device.
 
-The example below are instructions to setup [NSClient](http://www.nsclient.org/about/) to communicate with Icinga2 on Windows 8.1. For instructions on configuring [NPRE](http://exchange.nagios.org/directory/Addons/Monitoring-Agents/NRPE--2D-Nagios-Remote-Plugin-Executor/details), see [this Ubuntu 14.04 example](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nagios-npre-client.md).
+The example below are instructions to setup [NSClient](http://www.nsclient.org/about/) to communicate with Icinga2 on Windows 8.1. For instructions on configuring [NRPE](http://exchange.nagios.org/directory/Addons/Monitoring-Agents/NRPE--2D-Nagios-Remote-Plugin-Executor/details), see [this Ubuntu 14.04 example](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nagios-npre-client.md).
 
 To have this example work fully, a Central Server installation is required. See [here](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/icinga2-server.md) for help on setting up an Icinga2 Central Server.
 
@@ -33,7 +33,7 @@ I chose `Typical`.
 
 ![NSClient Wizard 1](https://github.com/jpfluger/examples/blob/master/windows/nsclient/nsclient-wiz1.png)
 
-Set the ip address of the Icinga2 Central Server. In these example, this server has an ip of `192.168.1.3`. Also choose to enable common plugins and the npre service.
+Set the ip address of the Icinga2 Central Server. In these example, this server has an ip of `192.168.1.3`. Also choose to enable common plugins and the NRPE service.
 
 ![NSClient Wizard 2](https://github.com/jpfluger/examples/blob/master/windows/nsclient/nsclient-wiz2.png)
 

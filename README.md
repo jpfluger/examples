@@ -17,7 +17,7 @@ Post-Install for a node-based web-server using nvm for node version management:
 Additional services:
 
   1. [Private NPM Registry with Sinopia](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/sinopia.md)
-  2. [Icinga2 central server using nginx and postgresql](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/icinga2-server.md)  (monitors targeted devices and/or aggregates host node Nagios notifications (NPRE))
+  2. [Icinga2 central server using nginx and postgresql](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/icinga2-server.md)  (monitors targeted devices and/or aggregates host node Nagios notifications (NRPE))
   3. Future... [Graphing Performance Data with Icinga2 and Graphite](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/icinga2-graphite.md)
 
 ## Windows

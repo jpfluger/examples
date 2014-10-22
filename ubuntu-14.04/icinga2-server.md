@@ -9,9 +9,9 @@ Let's be very clear about the multiple components needed for monitoring. It's no
    1. The central server uses ping, http or other commands to execute against the targeted device. No modules are installed on the targeted device.
    2. Install a client module on the remote device, which can then communicate with Icinga2
       * On Linux, install Nagios Remote Plugin Executor (NRPE) on the remote Linux device.
-      * On Windows, install NSClient++'s NPRE service on the remote Windows device.
+      * On Windows, install NSClient++'s NRPE service on the remote Windows device.
 
-The examples below cover setting up the **Central Server** and monitoring from the Central Server outwards towards targeted host devices. For setting up [NPRE](http://exchange.nagios.org/directory/Addons/Monitoring-Agents/NRPE--2D-Nagios-Remote-Plugin-Executor/details) or [NSClient](http://www.nsclient.org/about/) to communicate with Icinga, see [the NPRE Ubuntu 14.04 example](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nagios-npre-client.md) or [the NSClient++ Windows 8.1 example](https://github.com/jpfluger/examples/blob/master/windows/nsclient-windows.md).
+The examples below cover setting up the **Central Server** and monitoring from the Central Server outwards towards targeted host devices. For setting up [NRPE](http://exchange.nagios.org/directory/Addons/Monitoring-Agents/NRPE--2D-Nagios-Remote-Plugin-Executor/details) or [NSClient](http://www.nsclient.org/about/) to communicate with Icinga, see [the NRPE Ubuntu 14.04 example](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nagios-npre-client.md) or [the NSClient++ Windows 8.1 example](https://github.com/jpfluger/examples/blob/master/windows/nsclient-windows.md).
 
 ---
 
@@ -771,7 +771,7 @@ Your default interface should look like mine with zero errors!
 The server we just configured monitors in two ways:
 
 1. Local configs that target an action to itself (eg localhost) or towards a different device (eg using the ping command)
-2. Communicating directly with a device using the NPRE module, installed on the other device. See [this example](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nagios-npre-client.md) for configuring NPRE on a different device.
+2. Communicating directly with a device using the NRPE module, installed on the other device. See [this example](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nagios-npre-client.md) for configuring NRPE on a different device.
 
 As mentioned earlier, plugin commands were installed into `/usr/lib/nagios/plugins/`.
 

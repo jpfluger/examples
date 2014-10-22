@@ -1,6 +1,6 @@
 > Back to [Table of Contents](https://github.com/jpfluger/examples)
 
-# Nagios NPRE client
+# Nagios NRPE client
 
 Let's be very clear. There are components to monitoring. It's not difficult but can be confusing if not clearly communicated from the outset.
 
@@ -9,23 +9,23 @@ Let's be very clear. There are components to monitoring. It's not difficult but 
    1. The central server uses ping, http or other commands to execute against the targeted device. No modules are installed on the targeted device.
    2. Install a client module on the remote device, which can then communicate with Icinga2
       * On Linux, install Nagios Remote Plugin Executor (NRPE) on the remote Linux device.
-      * On Windows, install NSClient++ NPRE service on the remote Windows device.
+      * On Windows, install NSClient++ NRPE service on the remote Windows device.
 
-The example below covers setting up [NPRE](http://exchange.nagios.org/directory/Addons/Monitoring-Agents/NRPE--2D-Nagios-Remote-Plugin-Executor/details) on Ubuntu 14.04. For help on installing [NSClient++](http://www.nsclient.org/about/) on Windows see [this Windows 8.1 example](https://github.com/jpfluger/examples/blob/master/windows/nsclient-windows.md).
+The example below covers setting up [NRPE](http://exchange.nagios.org/directory/Addons/Monitoring-Agents/NRPE--2D-Nagios-Remote-Plugin-Executor/details) on Ubuntu 14.04. For help on installing [NSClient++](http://www.nsclient.org/about/) on Windows see [this Windows 8.1 example](https://github.com/jpfluger/examples/blob/master/windows/nsclient-windows.md).
 
 To have this example work fully, a Central Server installation is required. See [here](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/icinga2-server.md) for help on setting up an Icinga2 Central Server.
 
-## Install NPRE on Ubuntu Linux 14.04
+## Install NRPE on Ubuntu Linux 14.04
 
 On an Ubuntu 14.04 installation, I configured the ip to be `192.168.1.20` and the hostname to be `ub14-henry`.
 
-Install the NPRE packages.
+Install the NRPE packages.
 
 ```bash
 $ sudo apt-get install nagios-plugins nagios-nrpe-server
 ```
 
-Get the name of root filesystem because we will enter that in the npre config file next. My filesystem is `/dev/vda1`.
+Get the name of root filesystem because we will enter that in the NRPE config file next. My filesystem is `/dev/vda1`.
 
 ```bash
 $ df -h /
@@ -35,7 +35,7 @@ Filesystem      Size  Used Avail Use% Mounted on
 /dev/vda1        18G  4.4G   13G  27% /
 ```
 
-Open the npre config file.
+Open the NRPE config file.
 
 ```bash
 $ sudo vim /etc/nagios/nrpe.cfg
@@ -47,14 +47,14 @@ Edit as follows:
 # Change the server address to the private local ip of the server. 
 server_address=192.168.1.20
 
-# Tell this npre that it is okay for the ip address of the Icinga2 Central Server to connect to it
+# Tell this NRPE that it is okay for the ip address of the Icinga2 Central Server to connect to it
 allowed_hosts=192.168.1.3
 
 # Change /dev/hda1 to my root filesystem name, /dev/vda1
 command[check_hda1]=/usr/lib/nagios/plugins/check_disk -w 20% -c 10% -p /dev/vda1
 ```
 
-Restart npre.
+Restart NRPE.
 
 ```bash
 $ sudo service nagios-nrpe-server restart
@@ -165,3 +165,17 @@ object Service "disk" {
   vars.remote_nrpe_command = "check_hda1"
 }
 ```
+
+Check that configuration syntax is correct.
+
+```bash
+sudo service icinga2 checkconfig
+```
+
+Restart Icinga2.
+
+```bash
+sudo service icinga2 restart
+```
+
+Go to the Icinga-Web interface and refresh it. The nrpe checks should be `pending` and eventually will be successful or fail.
