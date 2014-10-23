@@ -340,12 +340,6 @@ Enable the `ido-pgsql` modules because the install wizard **did not** do it for 
 $ sudo icinga2-enable-feature ido-pgsql
 ```
 
-Since we are enabling features, let's also add `command`. This allows an external command pipe be accessible for web interfaces and Icinga addons to communicate with Icinga2.
-
-```bash
-$ sudo icinga2-enable-feature command
-```
-
 Restart icinga2.
 
 ```bash
@@ -518,7 +512,7 @@ Give the user `icinga_web` trusted authentication rights to start-stop postgresq
 First open the file.
 
 ```bash
-$ sudo vim /etc/postgresql/9.3/main/pg_hba.conf
+$ sudo vim /etc/postgresql/*/main/pg_hba.conf
 ```
 
 Just after the `icinga` entries added above, include:
@@ -687,6 +681,12 @@ Create the root web folder that nginx is pointed at.
 $ sudo mkdir -p /var/www/icinga
 ```
 
+Create a symlink from the nginx root to so that it appears as `icinga-web` under the published production web folder, `/var/www/icinga`.
+
+```bash
+$ sudo ln -s /usr/share/icinga-web/pub /var/www/icinga/icinga-web
+```
+
 Change permissions.
 
 ```bash
@@ -694,19 +694,14 @@ $ sudo chown -R www-data:www-data /var/www/icinga/icinga-web
 $ sudo chown -R www-data:www-data /usr/share/icinga-web
 ```
 
-Create a symlink from the nginx root to so that it appears as `icinga-web` under the published production web folder, `/var/www/icinga`.
-
-```bash
-$ sudo ln -s /usr/share/icinga-web/pub /var/www/icinga/icinga-web
-```
-
 ---
 
 
 Change the `icinga-pipe` entry in `access.xml`.
 
+
 ```bash
-$ sudo vim /usr/share/icinga-web/app/modules/Api/config/access.xml
+$ sudo vim /usr/share/icinga-web/etc/conf.d/access.xml
 ```
 
 Change the path to `/var/run/icinga2/cmd/icinga2.cmd`.
