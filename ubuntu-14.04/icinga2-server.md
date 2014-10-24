@@ -179,7 +179,13 @@ Check that we can pipe a command to Icinga2. This is how the Icinga-Web interfac
 -bash: /var/run/icinga2/cmd/icinga2.cmd: Permission denied
 ```
 
-Did that work for you?  No?  It didn't work for me and even replacing `nagios` with `www-data` will fail. **BUT** the command does for the website we configure later, so unless there is a overriding need to hack-in a fix, this can be safely left as-is. I do include a total hack to work-around this problem at the end of this tutorial. It's at the end because I don't change these permissions on my production server. Maybe someone can spot a better way to force a command-check on Ubuntu?
+Did that work for you?  No?  It didn't work for me and even replacing `nagios` with `www-data` will fail. **BUT** the command does work for the website we configure later. If we do need to execute this command from the terminal, the solution is to add the current user to the `www-data` group.
+
+```bash
+$ sudo usermod -a -G www-data `id -un`
+```
+
+Logout and then back in for the new group to be recognized. Rerun the command above successfully.
 
 ## Install Postgresql and let Icinga2 use it for storage
 
@@ -1035,50 +1041,3 @@ Quit from postgres with the `\q` command.
 ```sql
 postgres=# \q
 ```
-## Work-around Hack for command permissions
-
-Here is a total work-around hack for piping a command to the icinga2 command queue. It is not required for the web-interface to execute commands succesfully but I do have it here in case someone is interested in discovering a command-line fix for it.
-
-Open up the Icinga2 SysVInit file.
-
-```bash
-$ sudo vim /etc/init.d/icinga2
-```
-
-Edit line 52 to look like this:
-
-```
-chown "$DAEMON_USER":"$DAEMON_CMDGROUP" /var/run/icinga2/cmd
-#chmod 2710 /var/run/icinga2/cmd
-chmod 2777 /var/run/icinga2/cmd
-```
-
-At line 79, at the end of function do_start(), add this:
-
-```
-chmod 777 /var/run/icinga2/cmd/icinga2.cmd
-```
-
-Restart icinga2.
-
-```bash
-$ sudo service icinga2 restart
-```
-
-Rerun the forced check command.
-
-```bash
- $ /bin/echo "[`date +%s`] SCHEDULE_FORCED_SVC_CHECK;localhost;ping4;`date +%s`" >> /var/run/icinga2/cmd/icinga2.cmd
- ```
-
-No errors returned, right?  Let's check the log.
-
-```
-$ sudo tail -n 4 /var/log/icinga2/icinga2.log
-[2014-10-21 14:54:42 -0500] information/Application: Shutting down Icinga...
-[2014-10-21 14:54:42 -0500] information/CheckerComponent: Checker stopped.
-[2014-10-21 14:54:48 -0500] information/ConfigItem: Activated all objects.
-[2014-10-21 14:57:15 -0500] information/ExternalCommandListener: Executing external command: [1413921435] SCHEDULE_FORCED_SVC_CHECK;localhost;ping4;1413921435
-```
-
-Looks like the command queued just fine.
