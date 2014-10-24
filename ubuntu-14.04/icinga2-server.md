@@ -57,9 +57,13 @@ Available features: api checker command compatlog debuglog graphite icingastatus
 Enabled features: checker mainlog notification 
 ```
 
-> Note: `icinga2-enable-feature <NAME-OF-FEATURER>` will enable a feature and `icinga2-disable-feature <NAME-OF-FEATURER>` will disable a feature. An icinga2 restart is required after enabling or disabling features.
+> Note 1: `icinga2-enable-feature <NAME-OF-FEATURER>` will enable a feature and `icinga2-disable-feature <NAME-OF-FEATURER>` will disable a feature. An icinga2 restart is required after enabling or disabling features.
 
-During setup, the installer created the `nagios` user and group. This is the default setting in Debian/Ubuntu distributions. It also installed plugins. Remember that Icinga is a fork of Nagios and uses Nagios plugins. On an Debian/Ubuntu system, these are found here:
+> Note 2: By default the `notification` feature uses email for notifications. Digital Ocean has a [tutorial](https://www.digitalocean.com/community/tutorials/how-to-install-and-setup-postfix-on-ubuntu-14-04) on setting up simple email no Ubuntu 14.04.
+
+During setup, the installer created the `nagios` user and group. However, the icinga2-command daemon uses `www-data` as the group. This allows the website we configure later to uses its default `www-data` group to send commands to icinga2. These are the default setting set for us during the icinga2 Debian/Ubuntu apt package installation. 
+
+APT also installed plugins. We will refer to these in our host definitions later. For now though, feel free to check-out the available commands. On an Debian/Ubuntu system, these are found here:
 
 ```bash
 $ ls /usr/lib/nagios/plugins
@@ -70,7 +74,7 @@ check_by_ssh  check_dhcp     check_file_age  check_http  check_imap       check_
 check_clamd   check_disk     check_ftp       check_icmp  check_ircd       check_log     check_nagios    check_nt     check_ntp_time  check_ping    check_real   check_simap      check_ssh   check_tcp    check_ups   urlize
 ```
 
-More plugins are available via [The Monitoring Plugins](https://www.monitoring-plugins.org/) project, for which an ubuntu package can install them:
+More plugins are available via [The Monitoring Plugins](https://www.monitoring-plugins.org/) project. Install these now:
 
 ```bash
 $ sudo apt-get install nagios-plugins
@@ -171,55 +175,11 @@ $ sudo service icinga2 restart
 Check that we can pipe a command to Icinga2. This is how the Icinga-Web interface will pass instructions to Icinga2.
 
 ```bash
- $ /bin/echo "[`date +%s`] SCHEDULE_FORCED_SVC_CHECK;localhost;ping4;`date +%s`" >> /var/run/icinga2/cmd/icinga2.cmd
+ $ sudo -u nagios /bin/echo "[`date +%s`] SCHEDULE_FORCED_SVC_CHECK;localhost;ping4;`date +%s`" >> /var/run/icinga2/cmd/icinga2.cmd
 -bash: /var/run/icinga2/cmd/icinga2.cmd: Permission denied
 ```
 
-Did that work for you?  No?  It didn't work for me either. Here is a total work-around hack until a cleaner fix is found.
-
-Open up the Icinga2 SysVInit file.
-
-```bash
-$ sudo vim /etc/init.d/icinga2
-```
-
-Edit line 52 to look like this:
-
-```
-chown "$DAEMON_USER":"$DAEMON_CMDGROUP" /var/run/icinga2/cmd
-#chmod 2710 /var/run/icinga2/cmd
-chmod 2777 /var/run/icinga2/cmd
-```
-
-At line 79, at the end of function do_start(), add this:
-
-```
-chmod 777 /var/run/icinga2/cmd/icinga2.cmd
-```
-
-Restart icinga2.
-
-```bash
-$ sudo service icinga2 restart
-```
-
-Rerun the forced check command.
-
-```bash
- $ /bin/echo "[`date +%s`] SCHEDULE_FORCED_SVC_CHECK;localhost;ping4;`date +%s`" >> /var/run/icinga2/cmd/icinga2.cmd
- ```
-
-No errors returned, right?  Let's check the log.
-
-```
-$ sudo tail -n 4 /var/log/icinga2/icinga2.log
-[2014-10-21 14:54:42 -0500] information/Application: Shutting down Icinga...
-[2014-10-21 14:54:42 -0500] information/CheckerComponent: Checker stopped.
-[2014-10-21 14:54:48 -0500] information/ConfigItem: Activated all objects.
-[2014-10-21 14:57:15 -0500] information/ExternalCommandListener: Executing external command: [1413921435] SCHEDULE_FORCED_SVC_CHECK;localhost;ping4;1413921435
-```
-
-Looks like the command queued just fine.
+Did that work for you?  No?  It didn't work for me and even replacing `nagios` with `www-data` will fail. **BUT** the command does for the website we configure later, so unless there is a overriding need to hack-in a fix, this can be safely left as-is. I do include a total hack to work-around this problem at the end of this tutorial. It's at the end because I don't change these permissions on my production server. Maybe someone can spot a better way to force a command-check on Ubuntu?
 
 ## Install Postgresql and let Icinga2 use it for storage
 
@@ -360,7 +320,10 @@ By default nginx launches a web page that can now be accessed by your client bro
 http://icinga.example.com
 ```
 
-A little maintenance. Follow [this guide](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nginx-proxy.md) to setup nginx as a proxy but feel free to leave out the `myapp` configuration.
+A little nginx maintenance. Each of the two links below point to a section to follow to complete the nginx setup.
+
+  1. [Modify nginx.conf](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nginx-proxy.md#modify-nginxconf)
+  2. [Simplify nginx administration](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nginx-proxy.md#simplify-nginx-administration)
 
 ---
 
@@ -419,7 +382,7 @@ What does `cat /etc/timezone` return?
 $ cat /etc/timezone
 
 #OUTPUT
-US/Central
+America/Chicago
 ```
 
 Change `php.ini`.
@@ -744,7 +707,7 @@ $ sudo service nginx restart
 
 ---
 
-Refresh your web-browser that points to `icinga.example.com`. (I refreshed twice my browser twice before I was redirected correctly.) You will be redirected to the following:
+Refresh your web-browser that points to `icinga.example.com`. You will be redirected to the following:
 
 ```
 http://icinga.example.com/icinga-web/
@@ -757,7 +720,7 @@ The default Icinga-Web user and password are the following:
 
 Credentials can be changed after login. On the top-left of the window, you'll see an `Admin` menu. Navigate into there to start administering users.
 
-Your default interface should look like mine with zero errors!
+Your default interface should look like mine with zero errors! (If there is an error (eg Critical is red), try refreshing that panel and it should go away. There's a refresh button to the right of the green "1 OK" notification.)
 
 ![Default Icinga-Web Interface](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/icinga2/icinga-web-default.png)
 
@@ -1072,3 +1035,50 @@ Quit from postgres with the `\q` command.
 ```sql
 postgres=# \q
 ```
+## Work-around Hack for command permissions
+
+Here is a total work-around hack for piping a command to the icinga2 command queue. It is not required for the web-interface to execute commands succesfully but I do have it here in case someone is interested in discovering a command-line fix for it.
+
+Open up the Icinga2 SysVInit file.
+
+```bash
+$ sudo vim /etc/init.d/icinga2
+```
+
+Edit line 52 to look like this:
+
+```
+chown "$DAEMON_USER":"$DAEMON_CMDGROUP" /var/run/icinga2/cmd
+#chmod 2710 /var/run/icinga2/cmd
+chmod 2777 /var/run/icinga2/cmd
+```
+
+At line 79, at the end of function do_start(), add this:
+
+```
+chmod 777 /var/run/icinga2/cmd/icinga2.cmd
+```
+
+Restart icinga2.
+
+```bash
+$ sudo service icinga2 restart
+```
+
+Rerun the forced check command.
+
+```bash
+ $ /bin/echo "[`date +%s`] SCHEDULE_FORCED_SVC_CHECK;localhost;ping4;`date +%s`" >> /var/run/icinga2/cmd/icinga2.cmd
+ ```
+
+No errors returned, right?  Let's check the log.
+
+```
+$ sudo tail -n 4 /var/log/icinga2/icinga2.log
+[2014-10-21 14:54:42 -0500] information/Application: Shutting down Icinga...
+[2014-10-21 14:54:42 -0500] information/CheckerComponent: Checker stopped.
+[2014-10-21 14:54:48 -0500] information/ConfigItem: Activated all objects.
+[2014-10-21 14:57:15 -0500] information/ExternalCommandListener: Executing external command: [1413921435] SCHEDULE_FORCED_SVC_CHECK;localhost;ping4;1413921435
+```
+
+Looks like the command queued just fine.
