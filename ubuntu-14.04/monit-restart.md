@@ -201,6 +201,8 @@ Process 'nginx'                     Running
 System 'svr1'                       Not monitored
 ```
 
+Start node-app.
+
 ```bash
 $ sudo monit start node-app
 ```
