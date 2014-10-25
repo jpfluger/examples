@@ -403,7 +403,7 @@ Find `timezone` and comment it in.
 [Date]
 ; Defines the default timezone used by the date functions
 ; http://php.net/date.timezone
-date.timezone = US/Central
+date.timezone = America/Chicago
 ```
 
 Restart php services.

@@ -54,15 +54,13 @@ Use this [config file](https://github.com/jpfluger/examples/blob/master/ubuntu-1
 
 ## Simplify nginx administration
 
-Create [this script](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nginx/nginx_modsite.sh) in `/usr/bin` that will simplify nginx administration. The script was made possible by [Michael Lustfield](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nginx/nginx_modsite.sh) and [Ghassen Telmoudi](http://serverfault.com/questions/424452/nginx-enable-site-command).
-
 Create a new script file.
 
 ```bash
 sudo vim /usr/bin/nginx_modsite
 ```
 
-Add the content from Michael Lustfield's [script](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nginx/nginx_modsite.sh)
+Add the content from Michael Lustfield's [script](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nginx/nginx_modsite.sh). This script simplifies nginx administration. The script was made possible by [Michael Lustfield](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nginx/nginx_modsite.sh) and [Ghassen Telmoudi](http://serverfault.com/questions/424452/nginx-enable-site-command).
 
 Make the script executable.
 
