@@ -730,6 +730,21 @@ Your default interface should look like mine with zero errors! (If there is an e
 
 ![Default Icinga-Web Interface](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/icinga2/icinga-web-default.png)
 
+If error hints flash on the top-right of the browser window, the problem could be attributed to a "cronks" database configuration issue.
+
+Open the database configuration file.
+
+```bash
+$ sudo vim /usr/share/icinga-web/app/config/databases.xml 
+```
+
+Check the database connection string. In my file, the Icinga-Web connection is at the top and the Icinga2 IDO2DB is towards the bottom.
+
+```
+# FORMAT of connection string
+<ae:parameter name="dsn">pgsql://USERNAME:PASSWORD@localhost:5432/DBNAME</ae:parameter>
+```
+
 ## Tests
 
 The server we just configured monitors in two ways:
@@ -892,6 +907,7 @@ object HostGroup "example-com" {
 
   assign where host.vars.lan == "example.com"
 }
+```
 
 > Note. Services can also be grouped together. That's what the `ServiceGroup` property is for. But in the example below, notice that we do not need to declare a special `ServiceGroup` for our service objects. This is because the service object is already associated with `object Host`; thus, no `vars.lan` property need reside within the individual `object Service` definition.
 
@@ -940,6 +956,42 @@ $ sudo service icinga2 restart
 Go to the web interface and refresh it. On the left navigation bar, click on `Host groups` and the `Hostgroups Tab` will appear. Click the icon left of the name, then click `Hosts` or `Services` to inspect them.
 
 A visual overview if Icinga-Web [can be found here](http://docs.icinga.org/latest/en/icinga-web-introduction.html).
+
+---
+
+Services can receive groups too. If we had associated the `object Host` with a Linux or Windows server (e.g. `vars.os = "Linux"`), then the services that had already associated themselves to any Linux or Windows hosts would automatically receive a `ping` check. If that's the case, then our `ping4` check would be unnecessary and actually error. 
+
+Open the service defintion.
+
+```bash
+$ sudo vim /etc/icinga2/conf.d/services.conf
+```
+
+View how icinga2's default setup already assigns `ping` (ip4 and ip6) to any host with the Linux or Windows label.
+
+```
+apply Service "ping4" {
+  import "generic-service"
+
+  check_command = "ping4"
+  vars.sla = "24x7"
+
+  assign where "linux-servers" in host.groups
+  assign where "windows-servers" in host.groups
+  ignore where host.address == ""
+}
+
+apply Service "ping6" {
+  import "generic-service"
+
+  check_command = "ping6"
+  vars.sla = "24x7"
+
+  assign where "linux-servers" in host.groups
+  assign where "windows-servers" in host.groups
+  ignore where host.address6 == ""
+}
+```
 
 ## My Default Setup (for comparison)
 
