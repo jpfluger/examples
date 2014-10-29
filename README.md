@@ -13,6 +13,7 @@ Post-Install for a node-based web-server using nvm for node version management:
   5. [Nginx proxying multiple node sites](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nginx-proxy.md)
   6. [Restart with monit](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/monit-restart.md)
   7. [NRPE client](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/nagios-npre-client.md) (for Ubuntu 14.04) to communicate with Nagios/Icinga2
+  8. [Firewall with UFW](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/ufw.md)
 
 Additional services:
 
