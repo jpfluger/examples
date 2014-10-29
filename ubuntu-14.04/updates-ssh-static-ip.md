@@ -11,18 +11,28 @@ First provision a server using Ubuntu 14.04 Server. During install, choose netwo
 
 ---
 
-After the system reboots, you will login for the first time. Run the following commands now and then in the future to bring the system up-to-date.
+After the system reboots, you will login for the first time. Run the following commands now and then in the future to bring the system up-to-date with currently installed packages.
 
 ```bash
-sudo apt-get update
-sudo apt-get upgrade
+$ sudo apt-get update
+$ sudo apt-get upgrade
 ```
 
-Run these for a distribution upgrade (eg 14.04 to 14.04 r2)
+Run these for a distribution upgrade (eg 14.04 to 14.04 r2), which installs new packages (eg kernels) with dependencies and can auto-remove unused packages. This is not a system update (eg moving from Ubuntu Server 14.04 to 14.10). 
 
 ```bash
-sudo apt-get dist-upgrade
+$ sudo apt-get dist-upgrade
 ```
+
+> Note: For systems requiring strict adherence to a package update process, use a test system to `upgrade` and/or `dist-upgrade` servers and which automatically run tests against programs before updating production servers. 
+
+For system updates, run:
+
+```bash
+$ sudo do-release-upgrade
+```
+
+> Note: This server is Ubuntu Server 14.04, which is a [long-term release](https://wiki.ubuntu.com/Releases) with support ending in April 2019. In a production environment, since this is a LTR, I would not run a version release upgrade unless it was tested first.
 
 ---
 
