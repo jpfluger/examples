@@ -2,7 +2,7 @@
 
 # Firewall with UFW
 
-[UFW](http://manpages.ubuntu.com/manpages/trusty/en/man8/ufw.8.html) is an acronym for Uncomplicated Firewall. If UFW is uncomplicated, then what's a complicated firewall? UFW greatly simplifies iptables and ip6tables and is actually a wrapper around them, alleviating the potential missteps of making a mistake. Still not convinced? Then please reference [these iptable examples](http://www.cyberciti.biz/tips/linux-iptables-examples.html). 
+[UFW](http://manpages.ubuntu.com/manpages/trusty/en/man8/ufw.8.html) is an acronym for Uncomplicated Firewall. If UFW is uncomplicated, then what's a complicated firewall? UFW greatly simplifies iptables and ip6tables and is actually a wrapper around them, alleviating the potential missteps of making a mistake. Still not convinced? Then please reference these iptables [examples](http://www.cyberciti.biz/tips/linux-iptables-examples.html). 
 
 By default, UFW is installed on Ubuntu but is disabled. UFW has configuration files that can be edited. These files are located in:
 
@@ -103,7 +103,7 @@ $ sudo ufw limit 22/tcp
 $ sudo ufw allow 80/tcp
 ```
 
-> Note: `limit` refers to connection rate limiting to help prevent brute-force login attacks. When `limit` is used, by default Ubuntu allows the connection if there are no more than 6 connections within 30 seconds.
+> Note: `limit` refers to connection rate limiting to help prevent brute-force login attacks. When `limit` is used, by default the connection is allowed if there are no more than 6 connections within 30 seconds.
 
 View the status as a numbered list.
 
@@ -206,8 +206,6 @@ Allow SSH from anyone connecting via eth0 interface and who is in the 192.168.1.
 $ sudo ufw limit in on eth0 from 192.168.1.0/24 to any port 22 proto tcp
 ```
 
-sudo ufw allow in on eth0 from 10.10.1.1 to any port 22 proto tcp
-
 Allow HTTP from anyone connecting on on eth0 or eth1
 
 ```bash
@@ -228,7 +226,7 @@ Status: active
 
 ## Hardening the Dual NICs
 
-For Dual NICS on a DMZ'ed production server, I would tighten the host firewall rules further.
+For Dual NICS on a DMZ'ed production server, I would tighten the host firewall rules further. This is similar to how a single NIC was configured except the target destination might be on the internal interface or it might be on the public interface.
 
  * Allow outgoing DNS to a DNS server
  * Allow outgoing HTTP via a Proxy to the Ubuntu Servers defined in /etc/apt/sources.list
@@ -239,7 +237,7 @@ UFW nor iptables filters by domain name. As expressed before, it is [recommended
 
 ## Applications
 
-We aren't going to use the **Applications** feature right now but it might be something to take advantage of in the future. 
+We aren't going to use the **applications** feature right now but it might be something to take advantage of in the future. 
 
 List the applications that UFW knows have been installed.
 

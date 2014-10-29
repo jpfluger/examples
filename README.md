@@ -27,7 +27,6 @@ Additional services:
      * It should run on all versions of MS Windows
      * It can run on Linux too but pre-compiled binaries are currently unavailable
 
-
 ---
 
 ## [MIT Licensed](LICENSE)
