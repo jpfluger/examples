@@ -15,7 +15,7 @@ If you followed the [prior example](https://github.com/jpfluger/examples/blob/ma
 Before we install nvm-global, nvm is dependent on a few additional packages. Let's install those now.
 
 ```bash
-sudo apt-get install build-essential openssl libssl-dev git python
+$ sudo apt-get install build-essential openssl libssl-dev git python
 ```
 
 Install nvm-global.
@@ -29,32 +29,32 @@ wget -qO- https://raw.githubusercontent.com/xtuple/nvm/master/install.sh | sudo 
 List node versions currently installed.
 
 ```bash
-sudo nvm ls
+$ sudo nvm ls
 ```
 
 List available node versions. Current production is the 0.10.* branch.
 
 ```bash
-sudo nvm ls-remote | less
+$ sudo nvm ls-remote | less
 ```
 
 Install a node version. (nvm auto-switches to the new version)
 
 ```bash
-sudo nvm install 0.10.32
+$ sudo nvm install 0.10.32
 ```
 
 Use a node version. This is saved, even during restarts.
 
 ```bash
-sudo nvm use 0.10.32
+$ sudo nvm use 0.10.32
 ```
 
 View versions of node and node package manager (npm)
 
 ```bash
-sudo node -v
-sudo npm -v
+$ sudo node -v
+$ sudo npm -v
 ```
 
 ## Putting it together
