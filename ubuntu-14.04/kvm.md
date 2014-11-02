@@ -16,6 +16,8 @@ We will cover:
 * eth0 (dhcp and static)
 * eth0:0 (multiple IPs using aliases on a single network interface)
 * eth1 (a second network interface)
+* br0 (bridge) where bridge_ports = eth1
+* br1 (bridge) where bridge_ports = none
 
 ## My test system
 
@@ -347,9 +349,20 @@ PING 192.168.122.1 (192.168.122.1) 56(84) bytes of data.
 3 packets transmitted, 0 received, 100% packet loss, time 2015ms
 ```
 
-The ping request fails because this configuration has vmbr0 setup in "NAT" mode, as opposed to "route" mode - which we'll discuss later. 
+The ping request fails because the external router does not have knowledge of this network. Because my external network is emulated by my Linux Laptop, I can add the 192.168.122.0/22 network to my Laptop routing table and the ping works.
 
-Again, if you haven't already, I would suggest reading through this libvirt wiki on [Virtual Networking](http://wiki.libvirt.org/page/VirtualNetworking). It has diagrams and talks about NAT versus route modes on the virtual bridge definition.
+```
+$ sudo route add -net 192.168.122.0 netmask 255.255.255.0 br0
+$ ping -c 3 192.168.122.1
+PING 192.168.122.1 (192.168.122.1) 56(84) bytes of data.
+64 bytes from 192.168.122.1: icmp_seq=1 ttl=64 time=0.339 ms
+64 bytes from 192.168.122.1: icmp_seq=2 ttl=64 time=0.160 ms
+64 bytes from 192.168.122.1: icmp_seq=3 ttl=64 time=0.181 ms
+
+--- 192.168.122.1 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 1998ms
+rtt min/avg/max/mdev = 0.160/0.226/0.339/0.081 ms
+```
 
 ---
 
@@ -377,10 +390,10 @@ One fact to accept is that multiple interfaces can be assigned to use a single d
 | eth0:1         | linux                  | eth0                                              | yes b/c this is an [alias interface](https://wiki.debian.org/NetworkConfiguration#Multiple_IP_addresses_on_One_Interface) |
 | eth1           | linux                  | eth1                                              | yes                                                                                                      |
 | wlan0          | linux                  | wlan0                                             | yes, if connected through the same WIFI router                                                           |
-| br0            | linux; port = **eth0** | eth0                                              | yes b/c it uses eth0, which is a direct physical device definition                                       |
-| br1            | linux; port = **none** | no mapping (isolated bridge)                      | no: needs iptables rules to explicitly map incoming data from a device to br0 or vice-versa w/ NAT       |
-| virbr0         | libvirt; NAT mode      | eth0 via DNSMASQ and iptables                     | yes b/c it uses libvirt's virsh net-* commands to create bridge, DNSMASQ, DHCP Server and iptables rules |
-| virbr1         | libvirt; route mode    | eth0, when user chooses route interface           | yes b/c it uses libvirt's virsh net-* commands to create a routable bridge                               |
+| br0            | linux; port = **eth1** | eth1                                              | yes b/c it uses eth1, which is a direct physical device definition                                       |
+| br1            | linux; port = **none** | no mapping (isolated bridge)                      | no: needs iptables rules to explicitly map incoming data from a device to br1 or vice-versa              |
+| virbr0         | libvirt; NAT mode      | eth0 via iptables                                 | yes but not hosts                                                                                        |
+| virbr1         | libvirt; route mode    | eth0 via iptables                                 | yes b/c it uses libvirt's virsh net-* commands to create a routable bridge                               |
 | ovsbr0 (to-do) | openvswitch            | br0                                               | yes                                                                                                      |
 | bond0 (to-do)  | linux                  | eth0, eth1                                        | yes                                                                                                      |
 
@@ -686,7 +699,218 @@ PING 10.10.11.60 (10.10.11.60) 56(84) bytes of data.
 rtt min/avg/max/mdev = 0.199/0.246/0.328/0.059 ms
 ```
 
-## br0 (bridge)
+## br0 (bridge), where bridge_ports = eth1
 
+[Bridging](http://www.linuxfoundation.org/collaborate/workgroups/networking/bridge) connects two networks together to make one seemless transparent network. For our situation, this means a bridge interface can be created at the hypervisor level and then child hosts be assigned to use the hypervisor bridge interface. This will make it appear that the hypervisor and its hosts are on the same network. It operates at Level 2, only sees Ethernet frames and is protocol independent.
 
+Both [Debian](https://wiki.debian.org/BridgeNetworkConnections) and [libvirt](http://wiki.libvirt.org/page/Networking#Altering_the_interface_config) provide advice on how to configure bridging. The instructions in this section are for the traditional way we would setup a bridge in Ubuntu, where we assign the virtual interface `br0` an IP address and make it act behave like one interface.
+
+Open the `interfaces` file.
+
+```bash
+$ sudo vim /etc/network/interfaces
+```
+
+Create a new bridge interface and let it use the `eth1` interface directly for access to the network. Additionally, make its IP 192.168.77.1 and network 192.168.77.0/24 and remove the corresponding eth0:1 value.
+
+```
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+# The primary network interface
+auto eth0
+iface eth0 inet dhcp
+   up   ip addr add 10.10.11.50/24 dev $IFACE label $IFACE:0
+   down ip addr del 10.10.11.50/24 dev $IFACE label $IFACE:0
+
+# Secondary network interface
+auto eth1
+iface eth1 inet manual
+
+# The bridge interface
+auto br0
+iface br0 inet static
+   address 192.168.77.1
+   netmask 255.255.255.0
+   network 192.168.77.0
+   #ADDING OVERRIDES THE DEFAULT SET BY eth0 DHCP: gateway 192.168.77.1
+   #ADDING OVERRIDES THE DEFAULT SET BY eth0 DHCP: dns-nameservers 10.10.11.1
+   bridge_ports eth1
+   bridge_stp on
+   bridge_fd 0
+   bridge_maxwait 0
+```
+
+We kept the DHCP-enabled eth0 interface. This is important because the DHCP results return our "default gateway" (eg 10.10.11.1). We don't let our bridge override those settings.
+
+Reboot.
+
+```bash
+$ sudo reboot now
+```
+
+ssh back into the Test Server.
+
+```bash
+$ ssh USER@10.10.11.50
+```
+
+What does ifconfig look like?
+
+```bash
+$ ifconfig
+$ br0     Link encap:Ethernet  HWaddr 52:54:00:2e:52:ed  
+          inet addr:192.168.77.1  Bcast:192.168.77.255  Mask:255.255.255.0
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+
+eth0      Link encap:Ethernet  HWaddr 52:54:00:87:a5:22  
+          inet addr:10.10.11.248  Bcast:10.10.11.255  Mask:255.255.255.0
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+
+eth0:0    Link encap:Ethernet  HWaddr 52:54:00:87:a5:22  
+          inet addr:10.10.11.50  Bcast:0.0.0.0  Mask:255.255.255.0
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+
+eth1      Link encap:Ethernet  HWaddr 52:54:00:2e:52:ed  
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+
+lo        Link encap:Local Loopback  
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          UP LOOPBACK RUNNING  MTU:65536  Metric:1
+
+virbr0    Link encap:Ethernet  HWaddr 0e:36:67:f5:bf:1d  
+          inet addr:192.168.122.1  Bcast:192.168.122.255  Mask:255.255.255.0
+          UP BROADCAST MULTICAST  MTU:1500  Metric:1
+```
+
+Is the bridge pingable from the external network? It should be. The IP remains the same. Only the nature of the interface changes to bridge.
+
+From my external client:
+
+```bash
+$ ping -c 3 192.168.122.1
+PING 192.168.122.1 (192.168.122.1) 56(84) bytes of data.
+64 bytes from 192.168.122.1: icmp_seq=1 ttl=64 time=0.339 ms
+64 bytes from 192.168.122.1: icmp_seq=2 ttl=64 time=0.160 ms
+64 bytes from 192.168.122.1: icmp_seq=3 ttl=64 time=0.181 ms
+
+--- 192.168.122.1 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 1998ms
+rtt min/avg/max/mdev = 0.160/0.226/0.339/0.081 ms
+```
+
+## br1 (bridge) where bridge_ports = none
+
+Now we are going to create an isolated bridge network where bridge_ports is none. We want to experiment the behavior of child hosts when they connect with this bridge.
+
+Open the `interfaces` file.
+
+```bash
+$ sudo vim /etc/network/interfaces
+```
+
+Edit the file, adding `br1` with an IP address of 192.168.78.1 and network address of 192.168.78.0/24. 
+
+```
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+# The primary network interface
+auto eth0
+iface eth0 inet dhcp
+   up   ip addr add 10.10.11.50/24 dev $IFACE label $IFACE:0
+   down ip addr del 10.10.11.50/24 dev $IFACE label $IFACE:0
+
+# Secondary network interface
+auto eth1
+iface eth1 inet manual
+
+# The bridge interface
+auto br0
+iface br0 inet static
+   address 192.168.77.1
+   netmask 255.255.255.0
+   network 192.168.77.0
+   #ADDING OVERRIDES THE DEFAULT SET BY eth0 DHCP: gateway 192.168.77.1
+   #ADDING OVERRIDES THE DEFAULT SET BY eth0 DHCP: dns-nameservers 10.10.11.1
+   bridge_ports eth1
+   bridge_stp on
+   bridge_fd 0
+   bridge_maxwait 0
+
+# The bridge interface (no associated ports)
+auto br1
+iface br1 inet static
+   address 192.168.78.1
+   netmask 255.255.255.0
+   network 192.168.78.0
+   #ADDING OVERRIDES THE DEFAULT SET BY eth0 DHCP: gateway 192.168.78.1
+   #ADDING OVERRIDES THE DEFAULT SET BY eth0 DHCP: dns-nameservers 10.10.11.1
+   bridge_ports none
+   bridge_stp on
+   bridge_fd 0
+   bridge_maxwait 0
+```
+
+What do our interfaces look like?
+
+```bash
+$ ifconfig
+br0       Link encap:Ethernet  HWaddr 52:54:00:2e:52:ed  
+          inet addr:192.168.77.1  Bcast:192.168.77.255  Mask:255.255.255.0
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+
+br1       Link encap:Ethernet  HWaddr 12:d1:88:24:70:a5  
+          inet addr:192.168.78.1  Bcast:192.168.78.255  Mask:255.255.255.0
+          UP BROADCAST MULTICAST  MTU:1500  Metric:1
+
+eth0      Link encap:Ethernet  HWaddr 52:54:00:87:a5:22  
+          inet addr:10.10.11.248  Bcast:10.10.11.255  Mask:255.255.255.0
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+
+eth0:0    Link encap:Ethernet  HWaddr 52:54:00:87:a5:22  
+          inet addr:10.10.11.50  Bcast:0.0.0.0  Mask:255.255.255.0
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+
+eth1      Link encap:Ethernet  HWaddr 52:54:00:2e:52:ed  
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+
+lo        Link encap:Local Loopback  
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          UP LOOPBACK RUNNING  MTU:65536  Metric:1
+
+virbr0    Link encap:Ethernet  HWaddr a6:2f:80:62:04:c2  
+          inet addr:192.168.122.1  Bcast:192.168.122.255  Mask:255.255.255.0
+          UP BROADCAST MULTICAST  MTU:1500  Metric:1
+```
+
+Is it pingable from the external host?
+
+```bash
+$ sudo route add -net 192.168.78.0 netmask 255.255.255.0 br0
+$ ping -c 3 192.168.78.1
+PING 192.168.78.1 (192.168.78.1) 56(84) bytes of data.
+64 bytes from 192.168.78.1: icmp_seq=1 ttl=64 time=0.273 ms
+64 bytes from 192.168.78.1: icmp_seq=2 ttl=64 time=0.207 ms
+64 bytes from 192.168.78.1: icmp_seq=3 ttl=64 time=0.134 ms
+
+--- 192.168.78.1 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 1998ms
+rtt min/avg/max/mdev = 0.134/0.204/0.273/0.059 ms
+```
+
+Yes, but we had to add the route to the external device's routing table.
+
+## Create three VM hosts inside the Test Server
+
+We want to create two VM hosts within the Test Server. Their IP addresses will change depending on the scenario we desire to test. The hosts will be derived from a template.
+
+* host1: 192.168.77.2 using network interface br0
+* host2: 192.168.78.2 using network interface br1
+
+Each VM will allocate 4096 MB of hard drive space and 1024 RAM.
+
+---
 
