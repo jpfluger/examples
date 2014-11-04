@@ -18,6 +18,8 @@ We will cover:
 * eth1 (a second network interface)
 * br0 (bridge) where bridge_ports = eth1
 * br1 (bridge) where bridge_ports = none
+* Adding Uncomplicated Firewall (ufw)
+* Create VM hosts within the Test Server
 
 ## My test system
 
@@ -903,14 +905,381 @@ rtt min/avg/max/mdev = 0.134/0.204/0.273/0.059 ms
 
 Yes, but we had to add the route to the external device's routing table.
 
-## Create three VM hosts inside the Test Server
+## Adding Uncomplicated Firewall (ufw)
+
+To this point we have not discussed protection of the server using firewall rules. Linux uses `iptables` and `ip6tables` to manipulate the firewall packet forwarding tables. We can look at the current iptables configuration using the `iptables -L` command.
+
+```bash
+$ sudo iptables -L
+Chain INPUT (policy ACCEPT)
+target     prot opt source               destination         
+ACCEPT     udp  --  anywhere             anywhere             udp dpt:domain
+ACCEPT     tcp  --  anywhere             anywhere             tcp dpt:domain
+ACCEPT     udp  --  anywhere             anywhere             udp dpt:bootps
+ACCEPT     tcp  --  anywhere             anywhere             tcp dpt:bootps
+
+Chain FORWARD (policy ACCEPT)
+target     prot opt source               destination         
+ACCEPT     all  --  anywhere             192.168.122.0/24     ctstate RELATED,ESTABLISHED
+ACCEPT     all  --  192.168.122.0/24     anywhere            
+ACCEPT     all  --  anywhere             anywhere            
+REJECT     all  --  anywhere             anywhere             reject-with icmp-port-unreachable
+REJECT     all  --  anywhere             anywhere             reject-with icmp-port-unreachable
+
+Chain OUTPUT (policy ACCEPT)
+target     prot opt source               destination         
+ACCEPT     udp  --  anywhere             anywhere             udp dpt:bootpc
+```
+
+As we see, libvirt's auto-installation of the virbr0 bridge setup iptables rules for the 192.168.122.0/24 network. But did it do so for ip6tables?
+
+```bash
+$ sudo ip6tables -L
+Chain INPUT (policy ACCEPT)
+target     prot opt source               destination         
+
+Chain FORWARD (policy ACCEPT)
+target     prot opt source               destination         
+
+Chain OUTPUT (policy ACCEPT)
+target     prot opt source               destination
+```
+
+No, ip6tables rules were not applied.
+
+---
+
+Uncomplicated Firewall (ufw) is a utility that simplifies iptables and ip6tables under a single-unified command interface. It is much simpler to setup my firewall using `ufw` than iptables/ip6tabels. Let's run some tests to see how ufc effects our existing network interfaces.
+
+Enable the firewall and view its status.
+
+```bash
+$ sudo ufw enable
+$ sudo ufw status verbose
+Status: active
+Logging: on (low)
+Default: deny (incoming), allow (outgoing), deny (routed)
+New profiles: skip
+```
+
+The firewall rules were applied for both IPv4 and IPv6. You can verify by viewing the results of `sudo iptables -L` and `sudo ip6tables -L`. 
+
+Also the `ufw status verbose` results told us that all incoming packets to the Test Server were now being blocked.  However, incoming ping requests are still allowed. Pinging the existing Test Server interfaces from an external device will show successful results.
+
+```bash
+# ALL ARE SUCCESFUL, returning SUCCESSFUL PING results
+$ ping -c 3 10.10.11.248
+$ ping -c 3 10.10.11.50
+$ ping -c 3 192.168.77.1
+$ ping -c 3 192.168.78.1
+$ ping -c 3 192.168.122.1
+PING 192.168.122.1 (192.168.122.1) 56(84) bytes of data.
+64 bytes from 192.168.122.1: icmp_seq=1 ttl=64 time=0.305 ms
+64 bytes from 192.168.122.1: icmp_seq=2 ttl=64 time=0.133 ms
+64 bytes from 192.168.122.1: icmp_seq=3 ttl=64 time=0.136 ms
+
+--- 192.168.122.1 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 1998ms
+rtt min/avg/max/mdev = 0.133/0.191/0.305/0.081 ms
+```
+
+Ok, but is the ssh port 22 open? Let's run `nmap` from external devices.
+
+```bash
+$ nmap -Pn -p 22 10.10.11.248
+$ nmap -Pn -p 22 10.10.11.50
+$ nmap -Pn -p 22 192.168.77.1
+$ nmap -Pn -p 22 192.168.78.1
+$ nmap -Pn -p 22 192.168.122.1
+
+Starting Nmap 6.40 ( http://nmap.org ) at 2014-11-02 21:45 CST
+Nmap scan report for 192.168.122.1
+Host is up.
+PORT   STATE    SERVICE
+22/tcp filtered ssh
+
+Nmap done: 1 IP address (1 host up) scanned in 2.02 seconds
+```
+
+`nmap` makes it appear that port 22 is open but in fact the state of all **incoming** ufw packets is **deny** and not reject. **Deny** will silently drop the packets, which causes client connections to time-out. 
+
+From the external device, open a new ssh to the Test Server. (Or, if logging out or rebooting the server, you will need means to access the server to open the appropriate ufw ssh port to incoming packets.)
+
+
+```bash
+$ ssh avatar@10.10.11.248
+^C
+```
+
+This command fails. It hangs.
+
+Get back into the Test Server. Let's change the incoming packet rules for `ssh` to **reject**, just to demonstrate the difference than **deny**.
+
+```bash
+$ sudo ufw reject ssh
+Rule added
+Rule added (v6)
+```
+
+From the external client, try ssh again.
+
+```bash
+$ ssh avatar@10.10.11.248
+ssh: connect to host 10.10.11.248 port 22: Connection refused
+```
+
+Good. That's what we expect.
+
+Now let's enable ssh on the Test Server and check on its status.
+
+```bash
+$ sudo ufw allow ssh
+$ sudo ufw status verbose
+Status: active
+Logging: on (low)
+Default: deny (incoming), allow (outgoing), deny (routed)
+New profiles: skip
+
+To                         Action      From
+--                         ------      ----
+22                         ALLOW IN    Anywhere
+22 (v6)                    ALLOW IN    Anywhere (v6)
+```
+
+We can now ssh back into the Test Server.
+
+---
+
+At this point, we know `ufw` works with the existing bridges. But we don't know the exact nature of how `ufw` might work with client hosts, which we will create next. Therefore, let's reset the ufw rules back to the way they were before we used ufw. This will include a reboot.
+
+```bash
+$ sudo ufw reset
+$ sudo reboot now
+```
+
+ssh back into the Test Server. The `iptables -L` command will match the one we ran earlier.
+
+```bash
+$ sudo iptables -L
+Chain INPUT (policy ACCEPT)
+target     prot opt source               destination         
+ACCEPT     udp  --  anywhere             anywhere             udp dpt:domain
+ACCEPT     tcp  --  anywhere             anywhere             tcp dpt:domain
+ACCEPT     udp  --  anywhere             anywhere             udp dpt:bootps
+ACCEPT     tcp  --  anywhere             anywhere             tcp dpt:bootps
+
+Chain FORWARD (policy ACCEPT)
+target     prot opt source               destination         
+ACCEPT     all  --  anywhere             192.168.122.0/24     ctstate RELATED,ESTABLISHED
+ACCEPT     all  --  192.168.122.0/24     anywhere            
+ACCEPT     all  --  anywhere             anywhere            
+REJECT     all  --  anywhere             anywhere             reject-with icmp-port-unreachable
+REJECT     all  --  anywhere             anywhere             reject-with icmp-port-unreachable
+
+Chain OUTPUT (policy ACCEPT)
+target     prot opt source               destination         
+ACCEPT     udp  --  anywhere             anywhere             udp dpt:bootpc
+```
+
+## Create VM hosts inside the Test Server
 
 We want to create two VM hosts within the Test Server. Their IP addresses will change depending on the scenario we desire to test. The hosts will be derived from a template.
 
 * host1: 192.168.77.2 using network interface br0
-* host2: 192.168.78.2 using network interface br1
+* host2: 192.168.77.3 using network interface br0
 
 Each VM will allocate 4096 MB of hard drive space and 1024 RAM.
 
 ---
 
+We use [virsh](http://libvirt.org/sources/virshcmdref/html/) to manage VM guests and the hypervisor. 
+
+Commands can be run in series, such as:
+
+```bash
+$ sudo virsh pool-list --all
+ Name                 State      Autostart 
+-------------------------------------------
+```
+
+Or login to `virsh`, like one would with a database or shell program and issue virsh-only commands.
+
+```bash
+$ sudo virsh
+Welcome to virsh, the virtualization interactive terminal.
+
+Type:  'help' for help with commands
+       'quit' to quit
+
+virsh # pool-list --all
+ Name                 State      Autostart 
+-------------------------------------------
+```
+
+Logout of virsh.
+
+```bash
+virsh # quit
+```
+
+---
+
+On Ubuntu 14.04, the libvirt directory does not have a default storage directory in which storage pool definitions will be kept. Create that directory now.
+
+```bash
+$ sudo mkdir /etc/libvirt/storage
+```
+
+Open a new pool definition for editing.
+
+```bash
+$ sudo vim /etc/libvirt/storage/pool0.xml
+```
+
+Add the following.  Notice the UUID element is missing. We will let virsh auto-create this value.
+
+```xml
+<pool type='dir'>
+  <name>pool0</name>
+  <capacity unit='bytes'>0</capacity>
+  <allocation unit='bytes'>0</allocation>
+  <available unit='bytes'>0</available>
+  <source>
+  </source>
+  <target>
+    <path>/var/kvm/images</path>
+    <permissions>
+      <mode>0711</mode>
+      <owner>-1</owner>
+      <group>-1</group>
+    </permissions>
+  </target>
+</pool>
+```
+
+Create the directory where the libvirt storage pool images will be kept. This matches the `<path>` element in `pool0.xml`.
+
+```bash
+$ sudo mkdir -p /var/kvm/images
+```
+
+Define the pool using virsh.
+
+```bash
+$ sudo virsh pool-define /etc/libvirt/storage/pool0.xml
+Pool pool0 defined from /etc/libvirt/storage/pool0.xml
+```
+
+Verify the pool was created.
+
+```bash
+$ sudo virsh pool-list --all
+ Name                 State      Autostart 
+-------------------------------------------
+ pool0                 inactive   no        
+```
+
+And initialized with an UUID value.
+
+```bash
+$ sudo virsh pool-info pool0
+Name:           pool0
+UUID:           bc1094a9-e1f1-408d-b049-6d4962a41b5f
+State:          inactive
+Persistent:     yes
+Autostart:      no
+```
+
+Start the pool because it is currently inactive.
+
+```bash
+$ sudo virsh pool-start pool0
+Pool pool0 started
+```
+
+And schedule it to auto-start on reboot.
+
+```bash
+sudo virsh pool-autostart pool0
+Pool pool0 marked as autostarted
+```
+
+Check to see if it is now running and auto-start is true.
+
+```bash
+$ sudo virsh pool-info pool0
+Name:           pool0
+UUID:           bc1094a9-e1f1-408d-b049-6d4962a41b5f
+State:          running
+Persistent:     yes
+Autostart:      yes
+Capacity:       25.47 GiB
+Allocation:     1.95 GiB
+Available:      23.51 GiB
+```
+
+---
+
+> Note: Server World had two posts that were helpful in the following instructions. Please see [post 1](http://www.server-world.info/en/note?os=Ubuntu_14.04&p=kvm&f=2) and [post 2](http://www.server-world.info/en/note?os=Ubuntu_14.04&p=initial_conf). I had success running the "virt-install" command within the hypervisor directly installed on hardware and then copying both the image and xml definition into my nested child Test Server VM. I unsucessfully ran virt-install from within the nested VM hypervisor, where each time the creation process hung at random points. You will not have this problem if the Test Server hypervisor is not a virtual machine itself.
+
+We will create a VM image to serve as our VM template from which we will clone our two hosts.
+
+Do you have an ISO image of Ubuntu Server 14.04 available?  If not, download with `wget` or from an external device `scp` it to the Test Server.
+
+```bash
+$ scp ubuntu-14.04.1-server-amd64.iso USERNAME@10.10.11.248:~/ubuntu-server.iso
+ubuntu-14.04.1-server-amd64.iso                   100%  572MB 114.4MB/s   00:05 
+```
+
+Then I moved it to the /var/kvm directory.
+
+```bash
+$ sudo mv ~/ubuntu-server.iso /var/kvm/ubuntu-server.iso
+```
+
+Create the VM template which we are naming "template1". Size is in Gigabytes. The network is set to br0. Extra arguments are passed in so we can access it from the terminal. See the [virt-install](http://linux.die.net/man/1/virt-install) for all options.
+
+```bash
+$ sudo virt-install \
+			--name template1 \
+			--ram 1024 \
+			--disk path=/var/kvm/images/template1.img,size=4 \
+			--vcpus 1 \
+			--os-type linux \
+			--os-variant ubuntutrusty \
+			--network bridge=br0 \
+			--graphics none \
+			--location /var/kvm/ubuntu-server.iso \
+			--console pty,target_type=serial \
+			--extra-args 'console=ttyS0,115200n8 serial'
+```
+
+The install proceeds over the terminal. 
+
+To switch from the host terminal to the Test Server:
+
+```bash
+$ ctrl-]
+```
+
+To connect back from the Test Server to the running child host.
+
+```bash
+$ sudo virsh console template1
+```
+
+---
+
+Within the child host template, install nginx. We will use nginx to verify a working website when testing our firewall rules.
+
+```bash
+$ sudo apt-get install nginx
+```
+
+Shutdown the host.
+
+```bash
+$ sudo shutdown -h now
+```
+
+---
