@@ -393,7 +393,7 @@ One fact to accept is that multiple interfaces can be assigned to use a single d
 | eth1           | linux                  | eth1                                              | yes                                                                                                      |
 | wlan0          | linux                  | wlan0                                             | yes, if connected through the same WIFI router                                                           |
 | br0            | linux; port = **eth1** | eth1                                              | yes b/c it uses eth1, which is a direct physical device definition                                       |
-| br1            | linux; port = **none** | no mapping (isolated bridge)                      | no: needs iptables rules to explicitly map incoming data from a device to br1 or vice-versa              |
+| br1            | linux; port = **none** | no mapping (isolated bridge)                      | yes (why?)                                                                                               |
 | virbr0         | libvirt; NAT mode      | eth0 via iptables                                 | yes but not hosts                                                                                        |
 | virbr1         | libvirt; route mode    | eth0 via iptables                                 | yes b/c it uses libvirt's virsh net-* commands to create a routable bridge                               |
 | ovsbr0 (to-do) | openvswitch            | br0                                               | yes                                                                                                      |
@@ -1220,7 +1220,7 @@ Available:      23.51 GiB
 
 ---
 
-> Note: Server World had two posts that were helpful in the following instructions. Please see [post 1](http://www.server-world.info/en/note?os=Ubuntu_14.04&p=kvm&f=2) and [post 2](http://www.server-world.info/en/note?os=Ubuntu_14.04&p=initial_conf). I had success running the "virt-install" command within the hypervisor directly installed on hardware and then copying both the image and xml definition into my nested child Test Server VM. I unsucessfully ran virt-install from within the nested VM hypervisor, where each time the creation process hung at random points. You will not have this problem if the Test Server hypervisor is not a virtual machine itself.
+> Note: Server World had two posts that were helpful in the following instructions. Please see [post 1](http://www.server-world.info/en/note?os=Ubuntu_14.04&p=kvm&f=2) and [post 2](http://www.server-world.info/en/note?os=Ubuntu_14.04&p=initial_conf). I had success running the "virt-install" command within the hypervisor directly installed on hardware and then copying both the image and xml definition into my nested child Test Server VM. I unsucessfully ran virt-install from within the nested VM hypervisor, where each time the creation process hung at random points. The unsucessful attempts persisted even after I instructed the Test Server VM hypervisor to emulate the physical hardware of my laptop. You will not have this problem if the Test Server hypervisor is not a virtual machine itself but is part of the bare-bones install. 
 
 We will create a VM image to serve as our VM template from which we will clone our two hosts.
 
@@ -1282,4 +1282,57 @@ Shutdown the host.
 $ sudo shutdown -h now
 ```
 
+Check that the VM is "shut off".
+
+```bash
+$ sudo virsh list --all
+ Id    Name                           State
+----------------------------------------------------
+ -     template1                     shut off
+```
+
 ---
+
+Create the two host VMs using [virt-clone](http://linux.die.net/man/1/virt-clone). 
+
+First create `host1`.
+
+```bash
+$ sudo virt-clone --original template1 --name host1 --file /var/kvm/images/host1.img
+Allocating 'host1.img'                                    | 4.0 GB     00:18     
+
+Clone 'host1' created successfully.
+```
+
+And now `host2`.
+
+```bash
+$ sudo virt-clone --original template1 --name host2 --file /var/kvm/images/host2.img
+Allocating 'host2.img'                                    | 4.0 GB     00:18     
+
+Clone 'host2' created successfully.
+```
+
+Check the state of the VMs, which should all be "shut off".
+
+```bash
+$ sudo virsh list --all
+ Id    Name                           State
+----------------------------------------------------
+ -     host1                          shut off
+ -     host2                          shut off
+ -     template1                      shut off
+```
+
+For comparison of changes made between definition files, here is the results of difference test between host1.xml and template1.xml.
+
+```bash
+$ sudo diff --side-by-side --suppress-common-lines /etc/libvirt/qemu/template1.xml /etc/libvirt/qemu/host1.xml
+  virsh edit template1                                |   virsh edit host1
+  <name>template1</name>                              |   <name>host1</name>
+  <uuid>69a3f997-082c-e0aa-c613-8ce3f104d438</uuid>   |   <uuid>0567ce61-c0eb-d58d-44b5-3ff649b06e95</uuid>
+      <source file='/var/kvm/images/template1.img'/>  |       <source file='/var/kvm/images/host1.img'/>
+      <mac address='52:54:00:70:7c:de'/>              |       <mac address='52:54:00:cc:7c:fe'/>
+```
+
+As we can see `virt-clone`, created a new UUID and MAC address for the new host. This is good for us because all we need to do to activate networking is to boot-up each host and change the IP address and hostname so they will not conflict on the local network.
