@@ -20,6 +20,8 @@ We will cover:
 * br1 (bridge) where bridge_ports = none
 * Adding Uncomplicated Firewall (ufw)
 * Create VM hosts within the Test Server
+* Testing hosts on br0 and br1
+* Testing hosts on virbr0
 
 ## My test system
 
@@ -1337,7 +1339,7 @@ $ sudo diff --side-by-side --suppress-common-lines /etc/libvirt/qemu/template1.x
 
 As we can see `virt-clone`, created a new UUID and MAC address for the new host. This is good for us because all we need to do to activate networking is to boot-up each host and change the IP address and hostname so they will not conflict on the local network.
 
----
+## Testing hosts on br0 and br1
 
 Start `host1`, connect to it via the terminal and display its IP address using ifconfig.
 
@@ -1521,5 +1523,141 @@ No IPv4 address was assigned. Because `br1` has its `bridge_ports` value set to 
 
 Even though br1's bridge_ports is none, the hypervisor could create iptables rules that would automatically forward packets to a physical interface, like eth1, thereby bridging the isolated child VM with the wider network.
 
+---
+
+While we are logged-in to host1, let's create a static IP, where eth0 is on the same network as the bridge interface and restart.
+
+```bash
+$ sudo nano /etc/network/interfaces
+```
+
+Edit the interfaces file.
+
+```
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+# The primary network interface
+auto eth0
+iface eth0 inet static
+   address 192.168.78.2
+   netmask 255.255.255.0
+   network 192.168.77.0
+   gateway 192.168.77.1
+```
+
+Restart.
+
+```bash
+$ sudo reboot now
+```
+
+Wait for networking to come up. Login. Check ifconfig.
+
+```bash
+$ ifconfig
+eth0      Link encap:Ethernet  HWaddr 52:54:00:cc:7c:fe  
+          inet addr:192.168.78.2  Bcast:192.168.78.255  Mask:255.255.255.0
+          inet6 addr: fe80::5054:ff:fecc:7cfe/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+
+lo        Link encap:Local Loopback  
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          inet6 addr: ::1/128 Scope:Host
+          UP LOOPBACK RUNNING  MTU:65536  Metric:1
+```
+
+The static IP was successfully assigned.
+
+Can we ping the br1 interface?
+
+```bash
+$ ping -c 3 192.168.78.1
+PING 192.168.78.1 (192.168.78.1) 56(84) bytes of data.
+64 bytes from 192.168.78.1: icmp_seq=1 ttl=64 time=0.443 ms
+64 bytes from 192.168.78.1: icmp_seq=2 ttl=64 time=0.406 ms
+64 bytes from 192.168.78.1: icmp_seq=3 ttl=64 time=0.708 ms
+
+--- 192.168.78.1 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2003ms
+rtt min/avg/max/mdev = 0.406/0.519/0.708/0.134 ms
+```
+
+Yes, we can.
+
+How about the 10.10.11.1 server and other known IP addresses that we have tested previously?
+
+```bash
+$ ping -c 3 10.10.11.1
+connect: Network is unreachable
+$ ping -c 3 192.168.77.1
+connect: Network is unreachable
+$ ping -c 3 10.10.11.248
+connect: Network is unreachable
+$ ping -c 3 10.10.11.50
+connect: Network is unreachable
+```
+
+Nope.
+
+Can we ping 192.168.1.2 from an external device?
+
+```bash
+$ ping -c 3 192.168.78.2
+PING 192.168.78.2 (192.168.78.2) 56(84) bytes of data.
+From 10.10.11.1 icmp_seq=1 Destination Host Unreachable
+From 10.10.11.1 icmp_seq=2 Destination Host Unreachable
+From 10.10.11.1 icmp_seq=3 Destination Host Unreachable
+
+--- 192.168.78.2 ping statistics ---
+3 packets transmitted, 0 received, +3 errors, 100% packet loss, time 1999ms
+pipe 3
+```
+
+No, we cannot. Let's double-check that the br1 interface is still pingable from the external device.
+
+$ ping -c 3 192.168.78.1
+PING 192.168.78.1 (192.168.78.1) 56(84) bytes of data.
+64 bytes from 192.168.78.1: icmp_seq=1 ttl=64 time=0.278 ms
+64 bytes from 192.168.78.1: icmp_seq=2 ttl=64 time=0.371 ms
+64 bytes from 192.168.78.1: icmp_seq=3 ttl=64 time=0.429 ms
+
+--- 192.168.78.1 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 1999ms
+rtt min/avg/max/mdev = 0.278/0.359/0.429/0.064 ms
+```
+
+---
+
+Shutdown host1.
+
+```bash
+$ sudo shutdown -h now
+```
+
+## Testing hosts on virbr0
+
+Remember that virbr0 is configured as a NAT-based kvm virtual bridge that auto-manipulates firewalls. It also has a built in DHCP server.
+
+Let's edit host1 and host2 to both virbr0. 
+
+Edit host1.
+
+```bash
+$ sudo virsh edit host1
+```
+
+Change the bridge value to `virbr0`.
+
+```xml
+<source bridge='virbr0'/>
+```
+
+Do the same for host2.
+
+---
+
+Start host1, connect, login, and check its interfaces.
 
 
