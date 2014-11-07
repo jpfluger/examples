@@ -1336,3 +1336,190 @@ $ sudo diff --side-by-side --suppress-common-lines /etc/libvirt/qemu/template1.x
 ```
 
 As we can see `virt-clone`, created a new UUID and MAC address for the new host. This is good for us because all we need to do to activate networking is to boot-up each host and change the IP address and hostname so they will not conflict on the local network.
+
+---
+
+Start `host1`, connect to it via the terminal and display its IP address using ifconfig.
+
+```bash
+$ sudo virsh start host1
+$ sudo virsh console host1
+$ ifconfig
+eth0      Link encap:Ethernet  HWaddr 52:54:00:cc:7c:fe  
+          inet addr:10.10.11.238  Bcast:10.10.11.255  Mask:255.255.255.0
+          inet6 addr: fe80::5054:ff:fecc:7cfe/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+
+lo        Link encap:Local Loopback  
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          UP LOOPBACK RUNNING  MTU:65536  Metric:1
+```
+
+Can host1 ping the hypervisor's IP address?
+
+```bash
+$ ping -c 3 10.10.11.50
+$ ping -c 3 10.10.11.248
+PING 10.10.11.248 (10.10.11.248) 56(84) bytes of data.
+64 bytes from 10.10.11.248: icmp_seq=1 ttl=64 time=0.460 ms
+64 bytes from 10.10.11.248: icmp_seq=2 ttl=64 time=0.571 ms
+64 bytes from 10.10.11.248: icmp_seq=3 ttl=64 time=0.849 ms
+
+--- 10.10.11.248 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2004ms
+rtt min/avg/max/mdev = 0.460/0.626/0.849/0.166 ms
+```
+
+Yes it can for both the hypervisor's eth0 and eth0:0 interface.
+
+But we cannot ping the IPv4 address for the br0 or br1 interfaces of the hypervisor. Try it.
+
+```bash
+$ ping -c 3 192.168.77.1
+PING 192.168.77.1 (192.168.77.1) 56(84) bytes of data.
+
+--- 192.168.77.1 ping statistics ---
+3 packets transmitted, 0 received, 100% packet loss, time 1999ms
+
+$ ping -c 3 192.168.78.1
+PING 192.168.78.1 (192.168.78.1) 56(84) bytes of data.
+
+--- 192.168.78.1 ping statistics ---
+3 packets transmitted, 0 received, 100% packet loss, time 2017ms
+```
+
+Why?  
+
+The child VM (host1) has its IP address set to use DHCP. Even though host1 uses a bridge (br0) on the 192.168.77.0 network, it does not mean host1 automatically is on the 192.168.77.0 network. Rather the bridge connects host1 to the other interfaces and through them it contacts the DHCP server residing on the 10.10.11.0 network.
+
+In fact host1 does not have knowledge of the 192.168.77.0 network at all. Look at its routing table.
+
+```bash
+$ route
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+default         10.10.11.1      0.0.0.0         UG    0      0        0 eth0
+10.10.11.0      *               255.255.255.0   U     0      0        0 eth0
+```
+
+Can host1 be pinged by an external device?
+
+```bash
+$ ping -c 3 10.10.11.238
+PING 10.10.11.238 (10.10.11.238) 56(84) bytes of data.
+64 bytes from 10.10.11.238: icmp_seq=1 ttl=64 time=0.974 ms
+64 bytes from 10.10.11.238: icmp_seq=2 ttl=64 time=0.426 ms
+64 bytes from 10.10.11.238: icmp_seq=3 ttl=64 time=0.230 ms
+
+--- 10.10.11.238 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2000ms
+rtt min/avg/max/mdev = 0.230/0.543/0.974/0.315 ms
+```
+
+Yes it can.
+
+---
+
+Start the second child VM, `host2`, connect to it, login and show the interfaces.
+
+```bash
+$ sudo virsh start host2
+$ sudo virsh console host2
+$ ifconfig
+eth0      Link encap:Ethernet  HWaddr 52:54:00:1c:fc:29  
+          inet addr:10.10.11.235  Bcast:10.10.11.255  Mask:255.255.255.0
+          inet6 addr: fe80::5054:ff:fe1c:fc29/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+
+lo        Link encap:Local Loopback  
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          UP LOOPBACK RUNNING  MTU:65536  Metric:1
+```
+
+We already know from host1 that this VM can ping other clients on the same 10.10.11.0 network. 
+
+Try to ping host1.
+
+```bash
+$ ping -c 3 10.10.11.235
+PING 10.10.11.235 (10.10.11.235) 56(84) bytes of data.
+64 bytes from 10.10.11.235: icmp_seq=1 ttl=64 time=0.526 ms
+64 bytes from 10.10.11.235: icmp_seq=2 ttl=64 time=0.160 ms
+64 bytes from 10.10.11.235: icmp_seq=3 ttl=64 time=0.088 ms
+
+--- 10.10.11.235 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2004ms
+rtt min/avg/max/mdev = 0.088/0.258/0.526/0.191 ms
+```
+
+Good. That worked.
+
+We learned something interesting about Linux bridging: it is transparent, hooking together different subnets while at the same time not having knowledge of them, even if the bridge is configured with an IP for a different subnet. 
+
+Now, we'll use virsh to edit the host1 and host2 VM configurations, changing br0 to br1. Remember br1 has bridge_ports set to "none". Will the VM children act differently?
+
+---
+
+Shutdown the two VMs, if they are still running.
+
+```bash
+$ sudo virsh console host1
+$ sudo shutdown -h now
+$ sudo virsh console host2
+$ sudo shutdown -h now
+$ sudo virsh list --all
+ Id    Name                           State
+----------------------------------------------------
+ -     host1                          shut off
+ -     host2                          shut off
+ -     template2                      shut off
+```
+
+---
+
+Edit host1.
+
+```bash
+$ sudo virsh edit host1
+```
+
+Change the bridge value to `br1`.
+
+```xml
+<source bridge='br1'/>
+```
+
+Do the same for host2.
+
+---
+
+Start host1, connect, login, and check its interfaces.
+
+```bash
+$ sudo virsh start host1
+$ sudo virsh console host1
+# WAITING FOREVER (after a few minutes it WILL allow you to connect)
+$ ifconfig
+eth0      Link encap:Ethernet  HWaddr 52:54:00:cc:7c:fe  
+          inet6 addr: fe80::5054:ff:fecc:7cfe/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+
+lo        Link encap:Local Loopback  
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          inet6 addr: ::1/128 Scope:Host
+          UP LOOPBACK RUNNING  MTU:65536  Metric:1
+
+$ ping -c 3 10.10.11.1
+connect: Network is unreachable
+$ ping -c 3 192.168.77.1
+connect: Network is unreachable
+$ ping -c 3 192.168.78.1
+connect: Network is unreachable
+```
+
+No IPv4 address was assigned. Because `br1` has its `bridge_ports` value set to `none`, the br1 interface has not connected with a physical interface and therefore DHCP packets will not be transparently forwarded from host1 to br1 out through eth0/eth1 to the network. Contrast this with `br0`, which did have its `bridge_ports` assigned to `eth1` and therefore transaparently forwarded packets from host1 to br0 to eth1 and to the network.
+
+Even though br1's bridge_ports is none, the hypervisor could create iptables rules that would automatically forward packets to a physical interface, like eth1, thereby bridging the isolated child VM with the wider network.
+
+
+
