@@ -62,7 +62,7 @@ The server's currently configured IP is 10.10.11.248, which was allocated by DHC
 From an external device, ping this Server.
 
 ```bash
-$ $ ping -c 3 10.10.11.248
+$ ping -c 3 10.10.11.248
 PING 10.10.11.248 (10.10.11.248) 56(84) bytes of data.
 64 bytes from 10.10.11.248: icmp_seq=1 ttl=64 time=0.222 ms
 64 bytes from 10.10.11.248: icmp_seq=2 ttl=64 time=0.326 ms
@@ -1659,5 +1659,6 @@ Do the same for host2.
 ---
 
 Start host1, connect, login, and check its interfaces.
+
 
 
