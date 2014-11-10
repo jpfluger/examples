@@ -7,7 +7,7 @@
 There might be a need to change the hostname on the server. First let's see what the current fully-qualified-domain-name is:
 
 ```bash
-hostname -f
+$ hostname -f
 ```
 
 If the [prior example](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/updates-ssh-static-ip.md) was followed, this should return a fqdn, like:
@@ -35,7 +35,7 @@ We need to determine that two files are setup correctly.
 The file that contains the name of the server is `/etc/hostname`. Let's open that file:
 
 ```bash
-sudo vim /etc/hostname
+$ sudo vim /etc/hostname
 ```
 
 Feel free to change the name of the server here. You do not need to add on the domain name. The single name of the server is sufficient.
@@ -47,7 +47,7 @@ svr1
 Restart hostname, in order for the new hostname to be recognized by current system without a reboot.
 
 ```bash
-sudo service hostname restart
+$ sudo service hostname restart
 ```
 
 The file responsible for the fqdn and direct ip-to-fqdn mappings is `/etc/hosts`. The server looks here first, before ever consulting DNS. If you desire to trick your computer to thinking that www.google.com is your own computer, then this is the place to do it. But for our purposes, we want to use DNS and are only checking to ensure our server has the correct fqdn locally.
@@ -55,7 +55,7 @@ The file responsible for the fqdn and direct ip-to-fqdn mappings is `/etc/hosts`
 Open the file:
 
 ```bash
-sudo vim /etc/hosts
+$ sudo vim /etc/hosts
 ```
 
 Edit your ip-to-fqdn mappings. In order for the fqdn to be recognized, it must be placed before the short-name.
@@ -70,7 +70,7 @@ Edit your ip-to-fqdn mappings. In order for the fqdn to be recognized, it must b
 Run this again.
 
 ```bash
-hostname -f
+$ hostname -f
 ```
 
 And you should see your desired name.
