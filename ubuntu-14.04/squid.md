@@ -144,6 +144,8 @@ For configuring squid to authenticate users, please search the web. Some results
 
 ## Cntlm Proxy
 
+Login to an Ubuntu client that is to use Squid as its web-proxy. My client is located in a DMZ and only needs outbound access to DNS and the Ubuntu APT repositores. 
+
 Install [Cntlm Proxy](http://cntlm.sourceforge.net/), which is used on the client to communicate with a corporate proxy server, which in our case is Squid.
 
 ``` bash
@@ -164,7 +166,7 @@ Domain          DOMAIN-NAME
 Password        PASSWORD (although quite honestly I comment out this line and generate a hash later)
 ```
 
-Change the parent proxy line to only direct requests to the Squid proxy server. We are assuming Squid listens on port 3128, IPv4 address 195.168.1.51
+Change the parent proxy line to only direct requests to the Squid proxy server. We are assuming Squid listens on port 3128, IPv4 address 195.168.1.51.
 
 ```
 Proxy           192.168.1.51:3128
@@ -176,7 +178,7 @@ I also specify addresses to not pass parent proxies.
 NoProxy         localhost, 127.0.0.*
 ```
 
-Generate a cntlm password hash.
+Generate a cntlm password hash. This is not necessary for the current setup but it is here should you desire to implement additional accesses controls on the web-proxy.
 
 ```bash
 $ sudo cntlm -H
