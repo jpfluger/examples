@@ -143,12 +143,33 @@ $ sudo ufw reset
 
 If this is a production server, especially facing the public internet, I would tighten the host firewall rules further.
 
+ * Disallow all outgoing
  * Allow outgoing DNS to a DNS server
  * Allow outgoing HTTP via a Proxy to the Ubuntu Servers defined in /etc/apt/sources.list
  * Allow other outgoing protocols (eg Database Server, SMTP)
- * Reject all other outgoing
+
+By default disallow outgoing traffic.
+
+```bash
+$ sudo ufw default deny outgoing
+```
+
+Open the outbound connection for DNS. Assume our DNS server is 192.168.1.40.
+
+```bash
+$ sudo ufw allow out to 192.168.1.40 port 53
+```
 
 UFW nor iptables filters by domain name. It is [recommended](http://serverfault.com/questions/567396/ufw-deny-outbound-except-for-apt-get-updates) to point UFW outbound rules to a proxy-server. 
+
+Open outbound http and https connections to the proxy server, which we assume is 192.168.1.41.
+
+```bash
+$ sudo ufw allow out to 192.168.1.41 port 80
+$ sudo ufw allow out to 192.168.1.41 port 443
+```
+
+Open other outgoing protocols as needed.
 
 ## Dual NIC Configuration (DMZ)
 
@@ -228,12 +249,33 @@ Status: active
 
 For Dual NICS on a DMZ'ed production server, I would tighten the host firewall rules further. This is similar to how a single NIC was configured except the target destination might be on the internal interface or it might be on the public interface.
 
- * Allow outgoing DNS to a DNS server
- * Allow outgoing HTTP via a Proxy to the Ubuntu Servers defined in /etc/apt/sources.list
+ * Disallow all outgoing
+ * Allow outgoing DNS to an internal DNS server
+ * Allow outgoing HTTP via an internal Web-Proxy to the Ubuntu Servers defined in /etc/apt/sources.list
  * Allow other outgoing protocols (eg Database Server, SMTP)
- * Reject all other outgoing
+
+By default disallow outgoing traffic. This will deny on both interfaces, eth0 and eth1.
+
+```bash
+$ sudo ufw default deny outgoing
+```
+
+Open the outbound connection for DNS. Assume our DNS server is 192.168.1.40 and is accessed through interface eth0.
+
+```bash
+$ sudo ufw allow out on eth0 to 192.168.1.40 port 53
+```
 
 UFW nor iptables filters by domain name. As expressed before, it is [recommended](http://serverfault.com/questions/567396/ufw-deny-outbound-except-for-apt-get-updates) to point UFW outbound HTTP rules to a proxy-server. 
+
+Open outbound http and https connections to the internal web-proxy server, which we assume is 192.168.1.41 and is accessed through interface eth0.
+
+```bash
+$ sudo ufw allow out on eth0 to 192.168.1.41 port 80
+$ sudo ufw allow out on eth0 to 192.168.1.41 port 443
+```
+
+Open other outgoing protocols as needed.
 
 ## Applications
 
