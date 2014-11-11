@@ -273,6 +273,8 @@ Open outbound http and https connections to the internal web-proxy server, which
 ```bash
 $ sudo ufw allow out on eth0 to 192.168.1.41 port 80
 $ sudo ufw allow out on eth0 to 192.168.1.41 port 443
+# open outbound to a squid proxy server for updates
+$ sudo ufw allow out on eth0 to 192.168.1.45 port 3128
 ```
 
 Open other outgoing protocols as needed.
