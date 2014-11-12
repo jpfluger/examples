@@ -24,7 +24,7 @@ Notice towards the top the `set daemon 120` property. This property instructs mo
 set daemon 120            # check services at 2-minute intervals
 ```
 
-To enable http access to monit status and summaries, uncomment the first couple lines for the httpd service. This is optional. Later in this tutorial I provide instructions to stop and start services from the command line.
+To enable http access to monit status and summaries, uncomment the first couple lines for the httpd service. I discovered this is mandatory, even when using the command line to check monit `status` and `summary`.
 
 ```
 set httpd port 2812 and
