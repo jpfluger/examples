@@ -73,6 +73,7 @@ Woh!  Did you see that?  Squid is listining for IPv6 still. You might need to ki
 
 ```bash
 $ sudo kill 5012
+$ sudo service squid3 start
 $ sudo netstat -ntulp | grep LISTEN
 tcp        0      0 0.0.0.0:3128            0.0.0.0:*               LISTEN      7191/squid3     
 ```
@@ -81,9 +82,9 @@ Ah... that's more like it.
 
 ## Restricting website access
 
-If we require a more full-featured solution to restrict website access, we can install [squidGuard](http://www.squidguard.org/). See this Ubuntu [tutorial](http://www.cyberciti.biz/faq/squidguard-web-filter-block-websites/) for help.
+If we require a more full-featured solution to restrict website access, we can install [squidGuard](http://www.squidguard.org/) which will install pre-configured blacklists. See this Ubuntu [tutorial](http://www.cyberciti.biz/faq/squidguard-web-filter-block-websites/) for help.
 
-But in this example, we will explicitly define restricted domains.
+But in this example, we only want to allow access to a single domain, so we will explicitly define the domains within the existing Squid installation.
 
 Open the Squid configuration file.
 
@@ -122,15 +123,19 @@ Open the whitelist file for editing.
 $ sudo vim /etc/squid3/whitelist/updates.txt
 ```
 
-Add allowed domains. Add a "." prefix to include subdomains. For example, the following includes the google.com subdomains, www.google.com and news.google.com.
+Add allowed domains. Add a "." prefix to include subdomains. For example, ".google.coom" includes all google.com subdomains, such as www.google.com and news.google.com.
 
-But since in this example we are hardening Squid, we only want the whitelist to include repositories Ubuntu needs to keep its software updated.
+In our case, we only want the whitelist to include repositories Ubuntu needs to keep its software updated.
 
 ```
 .ubuntu.com
 ```
 
 Reload Squid. We will be testing this configuration later below.
+
+``bash
+$ sudo service squid3 reload
+```
 
 ## Additional configurations
 
