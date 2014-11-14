@@ -1640,7 +1640,36 @@ $ sudo shutdown -h now
 
 Remember that virbr0 is configured as a NAT-based kvm virtual bridge that auto-manipulates firewalls. It also has a built in DHCP server.
 
-Let's edit host1 and host2 to both virbr0. 
+List defined networks in virsh.
+
+```bash
+$ sudo virsh net-list --all
+ Name                 State      Autostart     Persistent
+----------------------------------------------------------
+ default              active     yes           yes
+```
+
+View the virtual network definition named "default".
+
+```
+$ sudo virsh net-edit default
+
+<network>
+  <name>default</name>
+  <uuid>dcdf7c3d-e4b1-457f-9209-ccdcb7b35ce7</uuid>
+  <forward mode='nat'/>
+  <bridge name='virbr0' stp='on' delay='0'/>
+  <ip address='192.168.122.1' netmask='255.255.255.0'>
+    <dhcp>
+      <range start='192.168.122.2' end='192.168.122.254'/>
+    </dhcp>
+  </ip>
+</network>
+```
+
+Notice this virtual bridge definition is of type "NAT" and has DHCP services built into it.
+
+Let's edit host1 and host2 to both use the "default" virtual network, virbr0. 
 
 Edit host1.
 
@@ -1648,17 +1677,135 @@ Edit host1.
 $ sudo virsh edit host1
 ```
 
-Change the bridge value to `virbr0`.
+Comment out the bridge type and replace with network. Omit a default MAC address because a new one will be auto-generated.
 
 ```xml
-<source bridge='virbr0'/>
+<interface type='network'>
+  <source network='default'/>
+</interface>
+```
+
+After saving, go back into the definition and note that extra properties were truly defined.
+
+```
+<interface type='network'>
+  <mac address='52:54:00:c4:87:cf'/>
+  <source network='default'/>
+  <model type='rtl8139'/>
+  <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x0'/>
+</interface>
 ```
 
 Do the same for host2.
 
 ---
 
-Start host1, connect, login, and check its interfaces.
+Start host1, connect, login, and open the interfaces file.
 
+```bash
+$ sudo nano /etc/network/interfaces
+```
 
+Ensure that `eth0` is set to dhcp.
+
+```
+auto eth0
+iface eth0 inet dhcp
+``
+
+Instead of rebooting, completely shutdown the virtual machine or else the new interface type will not be applied to the VM.
+
+```bash
+$ sudo shutdown -h now
+```
+
+Start up the VMs.
+
+```bash
+$ sudo virsh start host1
+$ sudo virsh console host1
+```
+
+The hosts should come up quickly. If they hang, then most likely its a network configuration issue.
+
+---
+
+In my lap environment, the DHCP'ed addresses are:
+
+* host1: 192.168.122.184
+* host2: 192.168.122.36
+
+Have the hosts try to ping each other. First host1 to host2.
+
+```bash
+$ ping -c 3 192.168.122.36
+PING 192.168.122.36 (192.168.122.36) 56(84) bytes of data.
+64 bytes from 192.168.122.36: icmp_seq=1 ttl=64 time=1.47 ms
+64 bytes from 192.168.122.36: icmp_seq=2 ttl=64 time=3.45 ms
+64 bytes from 192.168.122.36: icmp_seq=3 ttl=64 time=2.91 ms
+
+--- 192.168.122.36 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2003ms
+rtt min/avg/max/mdev = 1.476/2.614/3.451/0.835 ms
+```
+
+Now host2 to host1.
+
+```bash
+$ ping -c 3 192.168.122.184
+PING 192.168.122.184 (192.168.122.184) 56(84) bytes of data.
+64 bytes from 192.168.122.184: icmp_seq=1 ttl=64 time=4.70 ms
+64 bytes from 192.168.122.184: icmp_seq=2 ttl=64 time=3.40 ms
+64 bytes from 192.168.122.184: icmp_seq=3 ttl=64 time=3.34 ms
+
+--- 192.168.122.184 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2004ms
+rtt min/avg/max/mdev = 3.345/3.818/4.705/0.631 ms
+```
+
+And to the gateway interface, virbr0.
+
+```bash
+$ ping -c 3 192.168.122.1
+PING 192.168.122.1 (192.168.122.1) 56(84) bytes of data.
+64 bytes from 192.168.122.1: icmp_seq=1 ttl=64 time=0.825 ms
+64 bytes from 192.168.122.1: icmp_seq=2 ttl=64 time=0.977 ms
+64 bytes from 192.168.122.1: icmp_seq=3 ttl=64 time=1.35 ms
+
+--- 192.168.122.1 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2004ms
+rtt min/avg/max/mdev = 0.825/1.053/1.357/0.223 ms
+```
+
+From outside the network on a different device?
+
+First the network interface.
+
+```bash
+$ ping -c 3 192.168.122.1
+PING 192.168.122.1 (192.168.122.1) 56(84) bytes of data.
+64 bytes from 192.168.122.1: icmp_seq=1 ttl=64 time=0.434 ms
+64 bytes from 192.168.122.1: icmp_seq=2 ttl=64 time=0.374 ms
+64 bytes from 192.168.122.1: icmp_seq=3 ttl=64 time=0.341 ms
+
+--- 192.168.122.1 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 1998ms
+rtt min/avg/max/mdev = 0.341/0.383/0.434/0.038 ms
+```
+
+Now host1.
+
+```bash
+$ ping -c 3 192.168.122.184
+PING 192.168.122.184 (192.168.122.184) 56(84) bytes of data.
+From 10.10.11.1 icmp_seq=1 Destination Host Unreachable
+From 10.10.11.1 icmp_seq=2 Destination Host Unreachable
+From 10.10.11.1 icmp_seq=3 Destination Host Unreachable
+
+--- 192.168.122.184 ping statistics ---
+3 packets transmitted, 0 received, +3 errors, 100% packet loss, time 2017ms
+pipe 3
+```
+
+host2 was similarly unsuccessful.
 
