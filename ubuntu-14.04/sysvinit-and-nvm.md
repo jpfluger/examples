@@ -5,7 +5,7 @@
 [SysVinit](https://wiki.archlinux.org/index.php/SysVinit) is the first process executed and as such is the parent of all processes. SysVinit scripts are found in the /etc/init.d directory on debian-based systems. Maybe the following command is familiar to you?
 
 ```bash
-sudo service apache2 restart
+$ sudo service apache2 restart
 ```
 
 We'll write our own SysVinit script to run on Ubuntu 14.04 using nvm. But note that mainline linux distributions are moving towards systemd and sysvinit is becoming obsoleted. When this setup moves beyond Ubuntu 14.04, I will update these examples with a [migrate to systemd](https://wiki.archlinux.org/index.php/SysVinit#Migration_to_systemd) example (such as [found here](http://java.dzone.com/articles/nodejs-production)).
@@ -17,14 +17,14 @@ This example assumes installation of [nvm-global](https://github.com/xtuple/nvm)
 Create a new sysvinit script file in `/etc/init.d`. The file needs root ownership and executable permissions.
 
 ```bash
-sudo touch /etc/init.d/node-app
-sudo chmod a+x /etc/init.d/node-app
+$ sudo touch /etc/init.d/node-app
+$ sudo chmod a+x /etc/init.d/node-app
 ```
 
 Update the system service definitions. Note the number at the end of the command. A low number gets run first. I usually set my node apps with higher run-levels because of a time I could not get one program to run with the default `20`. 
 
 ```bash
-sudo update-rc.d node-app defaults 92
+$ sudo update-rc.d node-app defaults 92
 ```
 
 > For reference, to remove update-rc.d linkages to the sysvinit script, run `sudo update-rc.d -f node-app remove`. 
@@ -33,7 +33,7 @@ sudo update-rc.d node-app defaults 92
 Open the file in an editor.
 
 ```bash
-sudo vim /etc/init.d/node-app
+$ sudo vim /etc/init.d/node-app
 ```
 
 And edit this [template](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/sysvinit/node-app), replacing the example values with your own. 
@@ -56,44 +56,45 @@ We will tell our node-app to run using both an userid and groupid named `node-ap
 Does this groupid exist?
 
 ```bash
-getent group | cut -d: -f1 | grep node-app-ps
+$ getent group | cut -d: -f1 | grep node-app-ps
 ```
 
 Does this userid exist?
 
 ```bash
-awk -F':' '{ print $1}' /etc/passwd | grep node-app-ps
+$ awk -F':' '{ print $1}' /etc/passwd | grep node-app-ps
 ```
 
 If these did not return values, then create the new `node-app-ps` user and group. This `useradd` command creates both.
 
 
 ```bash
-sudo useradd -s /bin/bash -m -d /home/node-app-ps -c "safe node app process" node-app-ps
+$ sudo useradd -s /bin/bash -m -d /home/node-app-ps -c "safe node app process" node-app-ps
 ```
 
 Create a password for the user. (Enter twice)
 
 ```bash
-sudo passwd node-app-ps
+$ sudo passwd node-app-ps
 ```
 
 Add the user to the sudo group. The user can execute root commands but only with a password.
 
 ```bash
-sudo usermod -aG sudo node-app-ps
+$ sudo usermod -aG sudo node-app-ps
 ```
 
 Within the new home directory, I create a `prod` folder. Run these commands by ssh'ing into the server or running as the user via sudo.
 
 ```bash
 # sudo
-sudo node-app-ps
-mkdir ~/prod
+$ su node-app-ps
+$ mkdir ~/prod
 
+# or from a remote device
 # ssh
-ssh node-app-ps@svr1.example.com
-mkdir ~/prod
+$ ssh node-app-ps@svr1.example.com
+$ mkdir ~/prod
 ```
 
 The `prod` folder contains the source code (eg server.js). Each username created is unique for each production node application that has its own sysvinit script. The app's user credentials are used to scp files to the production server from source control or are obtained via git clone by the admin on the server. 
@@ -111,7 +112,7 @@ For my node-apps, I use Digital Ocean's model of creating a `safeuser` and runni
 Start the server. 
 
 ```bash
-sudo service node-app start
+$ sudo service node-app start
 ```
 
 View the process. `node` is the uid.
@@ -137,7 +138,7 @@ nvm(13256)───node(13287)───{node}(13288)
 View by ip:port.
 
 ```bash
-sudo netstat -ntulp | grep LISTEN | grep node
+$ sudo netstat -ntulp | grep LISTEN | grep node
 
 # OUTPUT
 tcp        0      0 127.0.0.1:1337          0.0.0.0:*               LISTEN      13287/node
@@ -146,7 +147,7 @@ tcp        0      0 127.0.0.1:1337          0.0.0.0:*               LISTEN      
 So far so good. Let's stop the server.
 
 ```bash
-sudo service node-app stop
+$ sudo service node-app stop
 ```
 
 View the process.
@@ -177,7 +178,7 @@ node-app-ps     13287  0.0  0.0 658912 11520 ?        Sl   17:31   0:00 /usr/loc
 Kill the specific process
 
 ```bash
-sudo kill -TERM 13287
+$ sudo kill -TERM 13287
 ```
 
 View the process.
