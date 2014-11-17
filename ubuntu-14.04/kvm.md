@@ -20,8 +20,11 @@ We will cover:
 * br1 (bridge) where bridge_ports = none
 * Adding Uncomplicated Firewall (ufw)
 * Create VM hosts within the Test Server
-* Testing hosts on br0 and br1
-* Testing hosts on virbr0
+* Test hosts on br0 and br1
+* Test hosts on virbr0 (NAT)
+* Test hosts on virbr1 (routed)
+* Test hosts on network77 (bridged)
+* Test hosts on network85 (Openvswitch)
 
 ## My test system
 
@@ -1808,4 +1811,638 @@ pipe 3
 ```
 
 host2 was similarly unsuccessful.
+
+## Test hosts on virbr1 (routed)
+
+Let's see what we have defined for our current networks in virsh.
+
+```bash
+$ sudo virsh net-list --all
+ Name                 State      Autostart     Persistent
+----------------------------------------------------------
+ default              active     yes           yes
+```
+
+From an earlier example, we already know "default" is defined as a NAT-based virtual bridge. See for yourself.
+
+```
+$ sudo virsh net-edit default
+
+<network>
+  <name>default</name>
+  <uuid>dcdf7c3d-e4b1-457f-9209-ccdcb7b35ce7</uuid>
+  <forward mode='nat'/>
+  <bridge name='virbr0' stp='on' delay='0'/>
+  ...
+```
+
+By default, a NAT-based virtual bridge blocks all incoming traffic to the VMs behind the bridge, similar to how an edge-firewall might function.
+
+But now we will define a different virtual bridge with "route" setting that will make the VMs behind it transparent to external devices.
+
+> Note: If you haven't yet, now is a good time to [read-up](http://wiki.libvirt.org/page/VirtualNetworking) on the different virtual bridges that libvirt offers. We'll be using virsh's [net-define](ftp://libvirt.org/libvirt/virshcmdref/html/sect-net-define.html) commands to create the virtual bridge.
+
+---
+
+Also it is a good idea to shutdown any VMs currently running. This can be done two ways.
+
+From within the VM.
+
+```bash
+# host1 and host2
+$ sudo shutdown -h now
+```
+
+Or from the hypervisor.
+
+```bash
+$ sudo virsh shutdown host1
+$ sudo virsh shutdown host1
+$ sudo virsh list --all
+ Id    Name                           State
+----------------------------------------------------
+ -     host1                          shut off
+ -     host2                          shut off
+ -     template2                      shut off
+```
+
+The state of the VM should be "shut off".
+
+> Note: If the VM does not shutdown force it to stop by using the "destroy" directive. No, it won't delete your VM image but only forcibly stop the VM process for that host. Full command looks like: `sudo virsh destroy host1`.
+
+---
+
+Which virtual networks have already been defined?
+
+```bash
+$ sudo virsh net-list --all
+ Name                 State      Autostart     Persistent
+----------------------------------------------------------
+ default              active     yes           yes
+```
+
+On the hypervisor, create a file that will become our new "routed" virtual bridge definition.
+
+```bash
+$ vim ~/virbr-route.xml
+```
+
+Add the following xml. 
+
+```xml
+<network>
+  <name>network80</name>
+  <bridge name="virbr80" />
+  <forward mode="route" />
+  <ip address="192.168.80.1" netmask="255.255.255.0" />
+</network>
+```
+
+> Note: In most libvirt examples, I see the bridge named virbr#. I'm changing it up by inserting a "r" just before the number, just to help me differentiate between the different interfaces I might see in "ifconfig". I'm also changing the number to reflect the 3rd digit of the IPv4 address.
+
+Load the definition into libvirt.
+
+```bash
+$ sudo virsh net-define virbr-route.xml 
+Network network80 defined from virbr-route.xml
+```
+
+Confirm the network is in our list.
+
+```bash
+$ sudo virsh net-list --all
+ Name                 State      Autostart     Persistent
+----------------------------------------------------------
+ default              active     yes           yes
+ network80            inactive   no            yes
+```
+
+The current state of `network80` is inactive. Newly defined networks need to be manually started.
+
+```bash
+$ sudo virsh net-start network80
+Network network80 started
+```
+
+Tell `network80` to also boot on start-up of the computer.
+
+```bash
+$ sudo virsh net-autostart network80
+Network network80 marked as autostarted
+```
+
+Check the network status.
+
+```bash
+$ sudo virsh net-list --all
+ Name                 State      Autostart     Persistent
+----------------------------------------------------------
+ default              active     yes           yes
+ network80            active     yes           yes
+```
+
+> Note: to disable a virtual network from auto-starting, pass in the `--disable` parameter, as in `sudo virsh net-autostart --disable network80`.
+
+Let's view the actual configuration file. The `net-dumpxml` command works like `cat` in that it ouputs the desired virtual network to stdout. We can edit the file if `net-dumpxml` is replaced with the `net-edit` command.
+
+```bash
+# To display
+$ sudo virsh net-dumpxml network80
+# To edit
+$ sudo virsh net-edit network80
+```
+
+The `net-define` command auto-created a UUID value, MAC address and added the stp and delay attributes to the bridge element.
+
+```xml
+<network>
+  <name>network80</name>
+  <uuid>77d3f0f6-0db4-47fe-8c4b-674807a6b706</uuid>
+  <forward mode='route'/>
+  <bridge name='virbr80' stp='on' delay='0'/>
+  <mac address='52:54:00:df:43:b5'/>
+  <ip address='192.168.80.1' netmask='255.255.255.0'>
+  </ip>
+</network>
+```
+
+The interface will now be running on the hypervisor.
+
+```bash
+$ ifconfig virbr80
+virbr80   Link encap:Ethernet  HWaddr 52:54:00:df:43:b5  
+          inet addr:192.168.80.1  Bcast:192.168.80.255  Mask:255.255.255.0
+          UP BROADCAST MULTICAST  MTU:1500  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0 
+          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
+```
+
+Let's ping it from an external device.
+
+```bash
+$ ping -c 3 192.168.80.1
+PING 192.168.80.1 (192.168.80.1) 56(84) bytes of data.
+64 bytes from 192.168.80.1: icmp_seq=1 ttl=64 time=0.628 ms
+64 bytes from 192.168.80.1: icmp_seq=2 ttl=64 time=0.302 ms
+64 bytes from 192.168.80.1: icmp_seq=3 ttl=64 time=0.322 ms
+
+--- 192.168.80.1 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 1998ms
+rtt min/avg/max/mdev = 0.302/0.417/0.628/0.150 ms
+```
+
+---
+
+Change the host1 and host2 configuration files to both use the "network80" virtual network, virbr80. 
+
+Edit host1.
+
+```bash
+$ sudo virsh edit host1
+```
+
+The source element's network attribute should have a value of "network80". The MAC address and NIC model will be auto-generated.
+
+```xml
+<interface type='network'>
+  <source network='network80'/>
+</interface>
+```
+
+After saving, go back into the definition and view that the extra elements were auto-created.
+
+```
+<interface type='network'>
+  <mac address='52:54:00:28:59:1e'/>
+  <source network='network80'/>
+  <model type='rtl8139'/>
+  <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x0'/>
+</interface>
+```
+
+Do the same for host2.
+
+---
+
+Start host1, connect, login, and check its interfaces.
+
+```bash
+$ sudo virsh start host1
+$ sudo virsh console host1
+# WAITING FOREVER (after a few minutes it WILL allow you to connect)
+$ ifconfig
+eth0      Link encap:Ethernet  HWaddr 52:54:00:28:59:1e  
+          inet6 addr: fe80::5054:ff:fe28:591e/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+
+lo        Link encap:Local Loopback  
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          inet6 addr: ::1/128 Scope:Host
+          UP LOOPBACK RUNNING  MTU:65536  Metric:1
+
+$ route
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+$ ping -c 3 192.168.80.1
+connect: Network is unreachable
+```
+
+The bridge above was not configured with DHCP, which we will do in a moment. Let's manually set a static IPv4 address to host1, reboot and see if this makes a difference.
+
+```bash
+sudo vim /etc/network/interfaces
+```
+
+```
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+# The primary network interface
+auto eth0
+iface eth0 inet static
+   address 192.168.80.2
+   netmask 255.255.255.0
+   network 192.168.80.0
+   gateway 192.168.80.1
+```
+
+Reboot.
+
+```bash
+$ sudo reboot now
+```
+
+Check the `eth0` interface, which now has 192.168.80.2 assigned to it.
+
+```bash
+$ ifconfig
+eth0      Link encap:Ethernet  HWaddr 52:54:00:28:59:1e  
+          inet addr:192.168.80.2  Bcast:192.168.80.255  Mask:255.255.255.0
+          inet6 addr: fe80::5054:ff:fe28:591e/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+
+lo        Link encap:Local Loopback  
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          inet6 addr: ::1/128 Scope:Host
+          UP LOOPBACK RUNNING  MTU:65536  Metric:1
+```
+
+What's the routing table look like? It has the default gateway set to 192.168.80.1. 
+
+```bash
+$ route
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+default         192.168.80.1    0.0.0.0         UG    0      0        0 eth0
+192.168.80.0    *               255.255.255.0   U     0      0        0 eth0
+```
+
+Can we ping the gateway? 
+
+```bash
+$ ping -c 3 192.168.80.1
+PING 192.168.80.1 (192.168.80.1) 56(84) bytes of data.
+64 bytes from 192.168.80.1: icmp_seq=1 ttl=64 time=0.353 ms
+64 bytes from 192.168.80.1: icmp_seq=2 ttl=64 time=1.02 ms
+64 bytes from 192.168.80.1: icmp_seq=3 ttl=64 time=1.18 ms
+
+--- 192.168.80.1 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2004ms
+rtt min/avg/max/mdev = 0.353/0.856/1.188/0.361 ms
+```
+
+Can we ping other interfaces defined by the hypervisor?
+
+```bash
+$ ping -c 3 192.168.77.1
+PING 192.168.77.1 (192.168.77.1) 56(84) bytes of data.
+64 bytes from 192.168.77.1: icmp_seq=1 ttl=64 time=0.824 ms
+64 bytes from 192.168.77.1: icmp_seq=2 ttl=64 time=1.24 ms
+64 bytes from 192.168.77.1: icmp_seq=3 ttl=64 time=1.02 ms
+
+--- 192.168.77.1 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2004ms
+rtt min/avg/max/mdev = 0.824/1.032/1.247/0.172 ms
+
+$ ping -c 3 192.168.78.1
+PING 192.168.78.1 (192.168.78.1) 56(84) bytes of data.
+64 bytes from 192.168.78.1: icmp_seq=1 ttl=64 time=0.538 ms
+64 bytes from 192.168.78.1: icmp_seq=2 ttl=64 time=1.26 ms
+64 bytes from 192.168.78.1: icmp_seq=3 ttl=64 time=0.935 ms
+
+--- 192.168.78.1 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2003ms
+rtt min/avg/max/mdev = 0.538/0.911/1.260/0.295 ms
+
+$ ping -c 3 192.168.122.1
+PING 192.168.122.1 (192.168.122.1) 56(84) bytes of data.
+64 bytes from 192.168.122.1: icmp_seq=1 ttl=64 time=0.451 ms
+64 bytes from 192.168.122.1: icmp_seq=2 ttl=64 time=1.10 ms
+64 bytes from 192.168.122.1: icmp_seq=3 ttl=64 time=1.69 ms
+
+--- 192.168.122.1 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2004ms
+rtt min/avg/max/mdev = 0.451/1.082/1.693/0.507 ms
+
+$ ping -c 3 10.10.11.50
+PING 10.10.11.50 (10.10.11.50) 56(84) bytes of data.
+64 bytes from 10.10.11.50: icmp_seq=1 ttl=64 time=0.252 ms
+64 bytes from 10.10.11.50: icmp_seq=2 ttl=64 time=1.24 ms
+64 bytes from 10.10.11.50: icmp_seq=3 ttl=64 time=1.14 ms
+
+--- 10.10.11.50 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2003ms
+rtt min/avg/max/mdev = 0.252/0.880/1.249/0.448 ms
+```
+
+Good. How about pinging outside the network, like to an internal DNS server or Google?
+
+```bash
+# internal DNS: 10.10.11.1 (NO, not recognized)
+$ ping -c 3 10.10.11.1
+PING 10.10.11.1 (10.10.11.1) 56(84) bytes of data.
+
+--- 10.10.11.1 ping statistics ---
+3 packets transmitted, 0 received, 100% packet loss, time 2017ms
+
+# external www.google.com (NO, not recognized)
+$ ping -c 3 www.google.com
+ping: unknown host www.google.com
+
+# external public DNS 4.2.2.2 (NO, not recognized)
+$ ping -c 3 4.2.2.2
+PING 10.10.11.1 (10.10.11.1) 56(84) bytes of data.
+--- 10.10.11.1 ping statistics ---
+3 packets transmitted, 0 received, 100% packet loss, time 2000ms
+```
+
+Nothing. `libvirt` does not auto-forward outside the hypervisor. We would need to add iptable rules to allow forwarding between interfaces. Although I could do this, I do not want to. I am looking for simplicity in setup, though I will return to this scenario if one of my latter tests fails to realize my desired outcome.
+
+---
+
+Let's create a new network configuration based off of network80 to create network77 and point it to use bridge `br0`. This isn't a libvirt virtual bridge but rather a direct connection to the bridge defined in our `interfaces` setup.
+
+Let's create a new network definition based off the existing `network80` definition.
+
+```bash
+$ sudo virsh net-edit network80
+```
+
+Edit as follows.
+
+```xml
+<network>
+  <name>network77</name>
+  <forward mode='bridge'/>
+  <bridge name='br0'/>
+</network>
+```
+
+Notice that network77 had a UUID auto-created for it.
+
+```
+$ sudo virsh net-dumpxml network77
+<network>
+  <name>network77</name>
+  <uuid>f42d80a7-fed9-48af-bff3-8638a9d43052</uuid>
+  <forward mode='bridge'/>
+  <bridge name='br0'/>
+</network>
+```
+
+List the available virtual networks.
+
+```bash
+$ sudo virsh net-list --all
+ Name                 State      Autostart     Persistent
+----------------------------------------------------------
+ default              active     yes           yes
+ network77            inactive   no            yes
+ network80            inactive   yes           yes
+```
+
+We need to start network77 and make it auto-start as well.
+
+```bash
+$ sudo virsh net-start network77
+Network network77 started
+
+$ sudo virsh net-autostart network77
+Network network77 marked as autostarted
+```
+
+---
+
+Edit host1's configuration.
+
+```bash
+$ sudo virsh edit host1
+```
+
+Change to use "network77".
+
+```xml
+<interface type='network'>
+  <source network='network77'/>
+</interface>
+```
+
+Let's boot up host1 and connect to it.
+
+```bash
+$ sudo virsh start host1
+$ sudo virsh console host1
+# Might need to wait to let the host network time-out
+```
+
+Open the interfaces file.
+
+```bash
+$ sudo vim /etc/network/interfaces
+```
+
+Edit to match the 192.168.77.0 network.
+
+```
+auto eth0
+iface eth0 inet static
+   address 192.168.77.2
+   netmask 255.255.255.0
+   network 192.168.77.0
+   gateway 192.168.77.1
+   dns-nameservers 10.10.11.1
+```
+
+Reboot.
+
+```bash
+$ sudo reboot now
+```
+
+What do our interfaces look like?
+
+```bash
+$ ifconfig
+eth0      Link encap:Ethernet  HWaddr 52:54:00:61:88:07  
+          inet addr:192.168.77.2  Bcast:192.168.77.255  Mask:255.255.255.0
+          inet6 addr: fe80::5054:ff:fe61:8807/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+
+lo        Link encap:Local Loopback  
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          inet6 addr: ::1/128 Scope:Host
+          UP LOOPBACK RUNNING  MTU:65536  Metric:1
+```
+
+Can we ping our bridge? (Yes)
+
+```bash
+$ ping -c 3 192.168.77.1
+PING 192.168.77.1 (192.168.77.1) 56(84) bytes of data.
+64 bytes from 192.168.77.1: icmp_seq=1 ttl=64 time=0.357 ms
+64 bytes from 192.168.77.1: icmp_seq=2 ttl=64 time=1.05 ms
+64 bytes from 192.168.77.1: icmp_seq=3 ttl=64 time=0.837 ms
+
+--- 192.168.77.1 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2004ms
+rtt min/avg/max/mdev = 0.357/0.748/1.052/0.292 ms
+```
+
+Can we ping the DNS server? (Yes)
+
+```bash
+$ ping -c 3 10.10.11.1
+PING 10.10.11.1 (10.10.11.1) 56(84) bytes of data.
+64 bytes from 10.10.11.1: icmp_seq=1 ttl=64 time=0.291 ms
+64 bytes from 10.10.11.1: icmp_seq=2 ttl=64 time=1.73 ms
+64 bytes from 10.10.11.1: icmp_seq=3 ttl=64 time=1.24 ms
+
+--- 10.10.11.1 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2003ms
+rtt min/avg/max/mdev = 0.291/1.090/1.735/0.600 ms
+```
+
+Can we ping outside the local networks? (No)
+
+```bash
+$ ping -c 3 www.google.com
+ping: unknown host www.google.com
+
+$ ping -c 3 4.2.2.2
+PING 4.2.2.2 (4.2.2.2) 56(84) bytes of data.
+
+--- 4.2.2.2 ping statistics ---
+3 packets transmitted, 0 received, 100% packet loss, time 2015ms
+```
+
+Hmmm... The inability for host1 to not have DNS services, when we can ping the DNS server (10.10.11.1) was unexpected. 
+
+---
+
+What if we set the host1 network interface to be on the same LAN as the DNS, which is IPv4 10.10.11.1?
+
+```bash
+$ sudo vim /etc/network/interfaces
+```
+
+Change the eth0 configuration.
+
+```
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+# The primary network interface
+auto eth0
+iface eth0 inet static
+   address 10.10.11.51
+   netmask 255.255.255.0
+   network 10.10.11.0
+   gateway 10.10.11.1
+   dns-nameservers 10.10.11.1
+```
+
+Reboot.
+
+```bash
+$ sudo reboot now
+```
+
+Once rebooted, run `ping` tests on host1.
+
+```bash
+$ ping -c 3 www.google.com
+PING www.google.com (74.125.225.146) 56(84) bytes of data.
+64 bytes from ord08s09-in-f18.1e100.net (74.125.225.146): icmp_seq=1 ttl=52 time=17.6 ms
+64 bytes from ord08s09-in-f18.1e100.net (74.125.225.146): icmp_seq=2 ttl=52 time=16.8 ms
+64 bytes from ord08s09-in-f18.1e100.net (74.125.225.146): icmp_seq=3 ttl=52 time=16.3 ms
+
+--- www.google.com ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2004ms
+rtt min/avg/max/mdev = 16.381/16.989/17.699/0.553 ms
+
+$ ping -c 3 10.10.11.1
+PING 10.10.11.1 (10.10.11.1) 56(84) bytes of data.
+64 bytes from 10.10.11.1: icmp_seq=1 ttl=64 time=0.529 ms
+64 bytes from 10.10.11.1: icmp_seq=2 ttl=64 time=1.18 ms
+64 bytes from 10.10.11.1: icmp_seq=3 ttl=64 time=0.597 ms
+
+--- 10.10.11.1 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2004ms
+rtt min/avg/max/mdev = 0.529/0.769/1.181/0.292 ms
+
+$ ping -c 3 192.168.77.1
+PING 192.168.77.1 (192.168.77.1) 56(84) bytes of data.
+
+--- 192.168.77.1 ping statistics ---
+3 packets transmitted, 0 received, 100% packet loss, time 2015ms
+
+$ ping -c 3 192.168.78.1
+PING 192.168.78.1 (192.168.78.1) 56(84) bytes of data.
+
+--- 192.168.78.1 ping statistics ---
+3 packets transmitted, 0 received, 100% packet loss, time 2015ms
+
+$ ping -c 3 192.168.80.1
+PING 192.168.80.1 (192.168.80.1) 56(84) bytes of data.
+
+--- 192.168.80.1 ping statistics ---
+3 packets transmitted, 0 received, 100% packet loss, time 2017ms
+
+$ ping -c 3 192.168.122.1
+PING 192.168.122.1 (192.168.122.1) 56(84) bytes of data.
+
+--- 192.168.122.1 ping statistics ---
+3 packets transmitted, 0 received, 100% packet loss, time 2015ms
+```
+
+Wow, that's better!  `host1` now has DNS services! And is transparent to other devices on the 10.10.11.0/24 network! But did you also see that host1 cannot detect other interfaces on the hypervisor?  This can be good or bad, depending on the desired use of host1. 
+
+Can we ping host1 from an external device?
+
+```bash
+$ ping 10.10.11.51
+PING 10.10.11.51 (10.10.11.51) 56(84) bytes of data.
+64 bytes from 10.10.11.51: icmp_seq=1 ttl=64 time=2.32 ms
+64 bytes from 10.10.11.51: icmp_seq=2 ttl=64 time=1.66 ms
+64 bytes from 10.10.11.51: icmp_seq=3 ttl=64 time=1.38 ms
+^C
+--- 10.10.11.51 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2003ms
+rtt min/avg/max/mdev = 1.387/1.792/2.323/0.392 ms
+```
+
+Great! Transparency!
+
+## Test hosts on network85 (Openvswitch)
+
+Maybe there is a better way to setup virtual bridges on the hypervisor. One of the latest projects is [Openvswitch](http://openvswitch.org/), advertised as "Production Quality, Multilayer Open Virtual Switch", and it's compatible with Linux. Let's set it up for testing now!
+
+
+
+
+
 
