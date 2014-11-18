@@ -13,7 +13,7 @@ My additions incorporate using Sinopia with nvm and sysvinit. For a detailed imp
 Sinopia uses [node-gyp](https://github.com/TooTallNate/node-gyp/) to cross-compile native addon modules to NodeJS. Install these baseline dependencies for node-gyp to function correctly.
 
 ```bash
-sudo apt-get install -y python-software-properties python g++ make
+$ sudo apt-get install -y python-software-properties python g++ make
 ```
 
 ---
@@ -21,7 +21,7 @@ sudo apt-get install -y python-software-properties python g++ make
 List node versions currently installed.
 
 ```bash
-sudo nvm ls
+$ sudo nvm ls
 
 #OUTPUT
   v0.10.28
@@ -33,7 +33,7 @@ current: 	v0.10.32
 Running the following npm command will by default use node version 0.10.32 to install Sinopia.
 
 ```bash
-sudo npm install -g sinopia
+$ sudo npm install -g sinopia
 ```
 
 ---
@@ -41,7 +41,7 @@ sudo npm install -g sinopia
 Warning: do not install an npm module globally, such as
 
 ```bash
-sudo nvm run 0.10.28 /usr/local/nvm/v0.10.28/lib/node_modules/npm/bin/npm-cli.js uninstall -g sinopia
+$ sudo nvm run 0.10.28 /usr/local/nvm/v0.10.28/lib/node_modules/npm/bin/npm-cli.js uninstall -g sinopia
 ```
 
 because doing so will not create the desired global link in `/usr/bin` or `/usr/local/bin`. Rather when we run sinopia individually, we can tell nvm to run the specific node-version against it. This is what we will tell our custom SysVinit script to do as well.
@@ -51,13 +51,13 @@ because doing so will not create the desired global link in `/usr/bin` or `/usr/
 Create where the private npm will reside.
 
 ```bash
-mkdir ~/sinopia; cd ~/sinopia
+$ mkdir ~/sinopia; cd ~/sinopia
 ```
 
 Run sinopia.
 
 ```bash
-sinopia
+$ sinopia
 
 #OUTPUT
 Config file doesn't exist, create a new one? (Y/n) 
@@ -81,7 +81,7 @@ Type `ctrl-c` to force the server to stop.  Save the password on display. This i
 In this directory, find the `config.yaml` file.
 
 ```bash
-ls
+$ ls
 
 #OUTPUT
 config.yaml
@@ -94,7 +94,7 @@ If multiple developers need access to this repository, change the default url in
 Open `config.yaml`.
 
 ```bash
-vim ~/config.yaml
+$ vim ~/config.yaml
 ```
 
 Find the line beginning with `listen` and edit as needed.
@@ -117,7 +117,7 @@ When Sinopia starts, `config.yaml` is read and because Sinopia was installed glo
 Create the Sinopia SysVInit file.
 
 ```bash
-sudo vim /etc/init.d/sinopia
+$ sudo vim /etc/init.d/sinopia
 ```
 
 Copy into your editor this [template](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/sysvinit/node-app), replacing the example values with those required by Sinopia. 
@@ -167,13 +167,13 @@ NODEUSER=node-app-ps:node-app-ps
 Start the service.
 
 ```bash
-sudo service sinopia start
+$ sudo service sinopia start
 ```
 
 Check that a process started for nvm and sinopia.
 
 ```bash
-sudo ps aux | grep nvm
+$ sudo ps aux | grep nvm
 
 #OUTPUT
 node-app-ps    1701  0.0  0.0  26760  2144 ?        S    15:40   0:00 /bin/bash /usr/local/bin/nvm run 0.10.32 /usr/local/bin/sinopia
@@ -182,7 +182,7 @@ node-app-ps    1701  0.0  0.0  26760  2144 ?        S    15:40   0:00 /bin/bash 
 Check if sinopia is listening on the expected port. Note that we do not `grep node` because nvm's target is the globally installed `sinopia`.
 
 ```bash
-sudo netstat -ntulp | grep LISTEN | grep sinopia
+$ sudo netstat -ntulp | grep LISTEN | grep sinopia
 
 #OUTPUT
 tcp        0      0 127.0.0.1:4873          0.0.0.0:*               LISTEN      1732/sinopia    
@@ -191,7 +191,7 @@ tcp        0      0 127.0.0.1:4873          0.0.0.0:*               LISTEN      
 If everything checks out, update the rc.d scripts so the script will start on boot.
 
 ```bash
-sudo update-rc.d sinopia defaults 92
+$ sudo update-rc.d sinopia defaults 92
 ```
 
 ## Configure npm to use Sinopia
@@ -199,13 +199,13 @@ sudo update-rc.d sinopia defaults 92
 Tell npm to use the Sinopia server.
 
 ```bash
-npm set registry "http://localhost:4873/"
+$ npm set registry "http://localhost:4873/"
 ```
 
 Verify that a `.npmrc` file has been created in your home folder.
 
 ```bash
-cat ~/.npmrc
+$ cat ~/.npmrc
 
 #OUTPUT
 registry=http://localhost:4873/
@@ -233,7 +233,7 @@ After you finish, the `.npmrc` file gets updated with additional properties.
 Edit `config.yaml`.
 
 ```bash
-sudo vim /etc/init.d/sinopia
+$ sudo vim /etc/init.d/sinopia
 ```
 
 Add the yaml code, as appropriate to your situtation. `loc-*:` signifies that any npm package prefixed by `loc-` will be treated as a private repository. For example, `loc-myapp` or `loc-clientapp`. The section for `*` tells Sinopia that all other packages should be reconciled against `npmjs`. The `allow_publish` command is set to `none`, which will help control accidental publishing.
@@ -278,8 +278,8 @@ As Dylant's [says](https://blog.dylants.com/2014/05/10/creating-a-private-npm-re
 Because we are running npm using nvm, it is required to publish npm modules with sudo.
 
 ```bash
-cd /directory/of/npm/module
-sudo npm publish
+$ cd /directory/of/npm/module
+$ sudo npm publish
 ```
 
 ## Logs
@@ -287,7 +287,7 @@ sudo npm publish
 SysVinit outputs Sinopia logs to `/var/log`. 
 
 ```bash
-cat /var/log/sinopia.log | less
+$ cat /var/log/sinopia.log | less
 ```
 
 ## Notes
@@ -295,7 +295,7 @@ cat /var/log/sinopia.log | less
 Debug as I might, I have one annoying "warning" that I have not been able to get rid of. When restarting Sinopia via the service command, I get the following output:
 
 ```bash
-sudo service sinopia restart
+$ sudo service sinopia restart
 
 #OUTPUT
 Restarting sinopia: a private npm repository pid=/var/run/sinopia.pid 
