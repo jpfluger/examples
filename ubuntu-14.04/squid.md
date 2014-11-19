@@ -125,10 +125,11 @@ $ sudo vim /etc/squid3/whitelist/updates.txt
 
 Add allowed domains. Add a "." prefix to include subdomains. For example, ".google.coom" includes all google.com subdomains, such as www.google.com and news.google.com.
 
-In our case, we only want the whitelist to include repositories Ubuntu needs to keep its software updated.
+In our case, we only want the whitelist to include repositories Ubuntu needs to keep its software updated. 
 
 ```
 .ubuntu.com
+.npmjs.org
 ```
 
 Reload Squid. We will be testing this configuration later below.
