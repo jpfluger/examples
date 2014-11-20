@@ -179,13 +179,13 @@ object Service "udpates" {
 Check that configuration syntax is correct.
 
 ```bash
-sudo service icinga2 checkconfig
+$ sudo service icinga2 checkconfig
 ```
 
 Restart Icinga2.
 
 ```bash
-sudo service icinga2 restart
+$ sudo service icinga2 restart
 ```
 
 Go to the Icinga-Web interface and refresh it. The nrpe checks should be `pending` and eventually will be successful or fail.
