@@ -63,14 +63,13 @@ In one command, run a targeted version of node. Test this using [server.js](http
 
 ```bash
 # run from within the same directory as server.js
-nvm run 0.10.32 server.js
+$ nvm run 0.10.32 server.js
 
 # or pass in the full path
-nvm run 0.10.32 /path/to/directory/server.js
+$ nvm run 0.10.32 /path/to/directory/server.js
 
 # or change to the directory first and then execute the command. This is what we do in the sysvinit example.
-cd /path/to/directory/ && exec nvm run 0.10.32 server.js
-
+$ cd /path/to/directory/ && exec nvm run 0.10.32 server.js
 ```
 
 View the process.
