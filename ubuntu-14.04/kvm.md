@@ -24,7 +24,8 @@ We will cover:
 * Test hosts on virbr0 (NAT)
 * Test hosts on virbr1 (routed)
 * Test hosts on network77 (bridged)
-* Test hosts on network85 (Openvswitch)
+* Test hosts on ovs-br0 (Openvswitch)
+* Test hosts on ovs-br1 (Openvswitch)
 
 ## My test system
 
@@ -132,7 +133,7 @@ $ lspci | grep -i ethernet
 $ lspci | grep -i wireless
 ```
 
-In the list you will see a hardware address followed by a description. Here are my lspci values for the two network card interfaces associated with the Test Server:
+In the list you will see a hardware address followed by a description. Here are my lspci values for the two network card interfaces associated with this Test Server:
 
 ```
 00:03.0 Ethernet controller: Red Hat, Inc Virtio network device
@@ -143,12 +144,12 @@ Now in the udev logs, we can search for devices mapped to interfaces by the pci 
 
 ```bash
 $ grep -i \(net\) /var/log/udev | sort -u
-KERNEL[0.800126] add      /devices/pci0000:00/0000:00:03.0/virtio0/net/eth0 (net)
-KERNEL[0.800138] add      /devices/pci0000:00/0000:00:04.0/virtio1/net/eth1 (net)
-KERNEL[0.800863] add      /devices/virtual/net/lo (net)
-UDEV  [0.851846] add      /devices/pci0000:00/0000:00:03.0/virtio0/net/eth0 (net)
-UDEV  [0.869047] add      /devices/pci0000:00/0000:00:04.0/virtio1/net/eth1 (net)
-UDEV  [0.905996] add      /devices/virtual/net/lo (net)
+KERNEL[0.925524] add      /devices/pci0000:00/0000:00:03.0/virtio0/net/eth0 (net)
+KERNEL[0.925535] add      /devices/pci0000:00/0000:00:04.0/virtio1/net/eth1 (net)
+KERNEL[0.926463] add      /devices/virtual/net/lo (net)
+UDEV  [0.994109] add      /devices/pci0000:00/0000:00:04.0/virtio1/net/eth1 (net)
+UDEV  [1.004974] add      /devices/pci0000:00/0000:00:03.0/virtio0/net/eth0 (net)
+UDEV  [1.120179] add      /devices/virtual/net/lo (net)
 ```
 
 These results show we have interfaces for `lo`, `eth0` and `eth1`. Notice the pci device points grep'ed from lspci are within the device path. 
@@ -2437,12 +2438,381 @@ rtt min/avg/max/mdev = 1.387/1.792/2.323/0.392 ms
 
 Great! Transparency!
 
-## Test hosts on network85 (Openvswitch)
+## Test hosts on ovs-br0 (Openvswitch)
 
 Maybe there is a better way to setup virtual bridges on the hypervisor. One of the latest projects is [Openvswitch](http://openvswitch.org/), advertised as "Production Quality, Multilayer Open Virtual Switch", and it's compatible with Linux. Let's set it up for testing now!
 
+> Note: Both the Openvswitch [FAQ](https://github.com/openvswitch/ovs/blob/master/FAQ.md) and [Configuration Cookbook](http://openvswitch.org/support/config-cookbooks/) have multiple configuration scenarios.
+
+We already installed Openvswitch above, having run the following command:
+
+```bash
+sudo apt-get install openvswitch-switch openvswitch-common
+```
+
+On the hypervisor, let's back-up the current interfaces file and then open it for editing.
+
+```bash
+$ sudo cp /etc/network/interfaces /etc/network/interfaces-back1
+$ sudo vim /etc/network/interfaces
+```
+
+Replace all contents.
+
+```bash
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+# eth0 - modified to use Openswitch
+auto eth0
+iface eth0 inet manual
+  ovs_bridge br0
+  ovs_type OVSPort
+  address 0.0.0.0
+
+# br0 - modified to use Openvswitch
+# I commented out the static properties but left them as a reference point
+auto br0
+allow-ovs br0
+iface br0 inet dhcp
+   #address 10.10.11.52
+   #netmask 255.255.255.0
+   #gateway 10.10.11.1
+   #dns-nameservers 10.10.11.1
+   ovs_type OVSBridge
+   ovs_ports eth0
+```
+
+> Note: See this [README](http://git.openvswitch.org/cgi-bin/gitweb.cgi?p=openvswitch;a=blob_plain;f=debian/openvswitch-switch.README.Debian) for help on Debian Openvswitch interface configuration.
+
+Add the bridge to Openvswitch.
+
+```bash
+$ sudo ovs-vsctl add-br br0
+```
+
+Add the working port (eth0) to Openvswitch.
+
+```bash
+$ sudo ovs-vsctl add-port br0 eth0
+```
+
+Reboot.
+
+```bash
+$ sudo reboot
+```
+
+Show the status of Openvswitch.
+
+```bash
+$ sudo ovs-vsctl show
+261a513a-ccdb-447d-a31b-5c6296eb102b
+    Bridge "br0"
+        Port "eth0"
+            Interface "eth0"
+        Port "br0"
+            Interface "br0"
+                type: internal
+    ovs_version: "2.0.2"
+```
+
+What does the interface look like for br0 and eth0?
+
+```bash
+$ ifconfig br0
+br0       Link encap:Ethernet  HWaddr 7a:69:93:3a:41:47  
+          inet addr:10.10.11.230  Bcast:10.10.11.255  Mask:255.255.255.0
+          inet6 addr: fe80::3495:6aff:feb2:2f9c/64 Scope:Link
+          UP BROADCAST RUNNING  MTU:1500  Metric:1
+
+eth0      Link encap:Ethernet  HWaddr 52:54:00:87:a5:22  
+          inet6 addr: fe80::5054:ff:fe87:a522/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+```
+
+Can we ping from the hypervisor outside? (Yes)
+
+```bash
+$ ping -c 3 10.10.11.1
+PING 10.10.11.1 (10.10.11.1) 56(84) bytes of data.
+64 bytes from 10.10.11.1: icmp_seq=1 ttl=64 time=0.234 ms
+64 bytes from 10.10.11.1: icmp_seq=2 ttl=64 time=0.130 ms
+64 bytes from 10.10.11.1: icmp_seq=3 ttl=64 time=0.133 ms
+
+--- 10.10.11.1 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 1998ms
+rtt min/avg/max/mdev = 0.130/0.165/0.234/0.050 ms
+
+$ ping -c 3 www.google.com
+PING www.google.com (74.125.225.19) 56(84) bytes of data.
+64 bytes from ord08s12-in-f19.1e100.net (74.125.225.19): icmp_seq=1 ttl=52 time=15.5 ms
+64 bytes from ord08s12-in-f19.1e100.net (74.125.225.19): icmp_seq=2 ttl=52 time=15.6 ms
+64 bytes from ord08s12-in-f19.1e100.net (74.125.225.19): icmp_seq=3 ttl=52 time=15.9 ms
+
+--- www.google.com ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2002ms
+rtt min/avg/max/mdev = 15.540/15.729/15.976/0.232 ms
+```
+
+Can an outside device ping this interface? (Yes)
+
+```bash
+$ ping -c 3 10.10.11.230
+PING 10.10.11.230 (10.10.11.230) 56(84) bytes of data.
+64 bytes from 10.10.11.230: icmp_seq=1 ttl=64 time=0.489 ms
+64 bytes from 10.10.11.230: icmp_seq=2 ttl=64 time=0.381 ms
+64 bytes from 10.10.11.230: icmp_seq=3 ttl=64 time=0.160 ms
+
+--- 10.10.11.230 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 1999ms
+rtt min/avg/max/mdev = 0.160/0.343/0.489/0.137 ms
+```
+
+---
+
+Let's stop libvirt's existing networks from running so we can get good test results.
+
+First, list the state of the virtual networks on the hypervisor.
+
+```bash
+$ sudo virsh net-list --all
+ Name                 State      Autostart     Persistent
+----------------------------------------------------------
+ default              active     yes           yes
+ network77            active     yes           yes
+ network80            active     yes           yes
+```
+
+Disable auto-start off.
+
+```bash
+$ sudo virsh net-autostart --disable default
+$ sudo virsh net-autostart --disable network77
+$ sudo virsh net-autostart --disable network80
+```
+
+Stop them. Remember, destroy "stops" and doesn't totally annihilate. To totally get rid of one, use the command "undefine".
 
 
+```bash
+$ sudo virsh net-destroy default
+$ sudo virsh net-destroy network77
+$ sudo virsh net-destroy network80
+```
 
+Reboot.
 
+```bash
+$ sudo reboot now
+```
+
+List the virtual networks.
+
+```bash
+$ sudo virsh net-list --all
+ Name                 State      Autostart     Persistent
+----------------------------------------------------------
+ default              inactive   no            yes
+ network77            active     yes           yes
+ network80            inactive   no            yes
+```
+
+Hmmm... look at that?!  Why is network77 still running?  Since I don't really need network77 anymore for my tests, I'll "undefine" it, removing it as a virtual switch.
+
+```bash
+$ sudo virsh net-destroy network77
+$ sudo virsh net-undefine network77
+```
+
+Reboot.
+
+```bash
+$ sudo reboot now
+```
+
+List the virtual networks.
+
+```bash
+$ sudo virsh net-list --all
+ Name                 State      Autostart     Persistent
+----------------------------------------------------------
+ default              inactive   no            yes
+ network80            inactive   no            yes
+```
+
+---
+
+Let's create the `ovs-52` network and load it into libvirt.
+
+Open a new file where we'll define the network.
+
+```bash
+$ vim ~/ovs-br0.xml
+```
+
+Add the following.
+
+```xml
+<network>
+  <name>ovs-br0</name>
+  <forward mode='bridge'/>
+  <bridge name='br0'/>
+  <virtualport type='openvswitch'/>
+</network>
+```
+
+Define it within libvirt.
+
+```bash
+$ sudo virsh net-define ovs-br0.xml
+Network ovs-br0 defined from ovs-br0.xml
+```
+
+List the virtual networks.
+
+```bash
+$ sudo virsh net-list --all
+ Name                 State      Autostart     Persistent
+----------------------------------------------------------
+ default              inactive   no            yes
+ network80            inactive   no            yes
+ ovs-br0              inactive   no            yes
+```
+
+Set `ovs-br0` to autostart.
+
+```bash
+$ sudo virsh net-autostart ovs-br0
+```
+
+Reboot.
+
+```bash
+$ sudo reboot now
+```
+
+List the virtual networks.
+
+```bash
+$ sudo virsh net-list --all
+ Name                 State      Autostart     Persistent
+----------------------------------------------------------
+ default              inactive   no            yes
+ network80            inactive   no            yes
+ ovs-br0              active     yes           yes
+```
+
+---
+
+Assign `host1` to use `ovs-br0`.
+
+Open `host1` for editing.
+
+```bash
+$ sudo virsh edit host1
+```
+
+Replace the element that defines the network interface with this:
+
+```xml
+<interface type='network'>
+  <source network='ovs-br0'/>
+</interface>
+```
+
+After saving, libvirt auto-creates extra default definitions. Here is what mine looks like:
+
+```xml
+<interface type='network'>
+  <mac address='52:54:00:cc:32:86'/>
+  <source network='ovs-br0'/>
+  <model type='rtl8139'/>
+  <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x0'/>
+</interface>
+```
+
+Start `host1` and login.
+
+```bash
+$ sudo virsh start host1
+```
+
+Open the interfaces file.
+
+```bash
+$ sudo vim /etc/network/interfaces
+```
+
+Define a static element.
+
+```
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+# The primary network interface
+auto eth0
+iface eth0 inet static
+   address 10.10.11.53
+   netmask 255.255.255.0
+   network 10.10.11.0
+   gateway 10.10.11.1
+   dns-nameservers 10.10.11.1
+```
+
+Reboot.
+
+```bash
+$ sudo reboot now
+```
+
+Can we ping from host1 to other IP addresses? (Yes)
+
+```bash
+$ ping -c 3 10.10.11.230
+PING 10.10.11.230 (10.10.11.230) 56(84) bytes of data.
+64 bytes from 10.10.11.230: icmp_seq=1 ttl=64 time=1.68 ms
+64 bytes from 10.10.11.230: icmp_seq=2 ttl=64 time=0.315 ms
+64 bytes from 10.10.11.230: icmp_seq=3 ttl=64 time=0.360 ms
+
+--- 10.10.11.230 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2003ms
+rtt min/avg/max/mdev = 0.315/0.788/1.689/0.637 ms
+
+$ ping -c 3 10.10.11.1
+PING 10.10.11.1 (10.10.11.1) 56(84) bytes of data.
+64 bytes from 10.10.11.1: icmp_seq=1 ttl=64 time=0.877 ms
+64 bytes from 10.10.11.1: icmp_seq=2 ttl=64 time=1.39 ms
+64 bytes from 10.10.11.1: icmp_seq=3 ttl=64 time=1.26 ms
+
+--- 10.10.11.1 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2003ms
+rtt min/avg/max/mdev = 0.877/1.177/1.390/0.222 ms
+
+$ ping -c 3 www.google.com
+PING www.google.com (173.194.46.81) 56(84) bytes of data.
+64 bytes from ord08s11-in-f17.1e100.net (173.194.46.81): icmp_seq=1 ttl=52 time=18.6 ms
+64 bytes from ord08s11-in-f17.1e100.net (173.194.46.81): icmp_seq=2 ttl=52 time=40.9 ms
+64 bytes from ord08s11-in-f17.1e100.net (173.194.46.81): icmp_seq=3 ttl=52 time=17.9 ms
+
+--- www.google.com ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2003ms
+rtt min/avg/max/mdev = 17.913/25.841/40.933/10.676 ms
+```
+
+Can outside devices ping host1? (Yes)
+
+```bash
+$ ping -c 3 10.10.11.53
+PING 10.10.11.53 (10.10.11.53) 56(84) bytes of data.
+64 bytes from 10.10.11.53: icmp_seq=1 ttl=64 time=2.99 ms
+64 bytes from 10.10.11.53: icmp_seq=2 ttl=64 time=1.44 ms
+64 bytes from 10.10.11.53: icmp_seq=3 ttl=64 time=0.655 ms
+
+--- 10.10.11.53 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2002ms
+rtt min/avg/max/mdev = 0.655/1.698/2.995/0.972 ms
+```
 
