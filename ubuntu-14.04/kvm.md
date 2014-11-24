@@ -2816,3 +2816,507 @@ PING 10.10.11.53 (10.10.11.53) 56(84) bytes of data.
 rtt min/avg/max/mdev = 0.655/1.698/2.995/0.972 ms
 ```
 
+Back on the hypervisor level, show the interfaces tied to Openvswitch. **venet0** is the virtual interface for **host1**.
+
+```bash
+$ sudo ovs-vsctl show
+261a513a-ccdb-447d-a31b-5c6296eb102b
+    Bridge "br0"
+        Port "vnet0"
+            Interface "vnet0"
+        Port "eth0"
+            Interface "eth0"
+        Port "br0"
+            Interface "br0"
+                type: internal
+    ovs_version: "2.0.2"
+```
+
+---
+
+Now, let's edit host2 to use the same Openvswitch libvirt network, `ovs-br0`.
+
+Open `host2` for editing.
+
+```bash
+$ sudo virsh edit host2
+```
+
+Replace the interface element with this:
+
+```xml
+<interface type='network'>
+  <source network='ovs-br0'/>
+</interface>
+```
+
+Start `host2`.
+
+```bash
+$ sudo virsh start host2
+```
+
+Open the interfaces file.
+
+```bash
+$ sudo vim /etc/network/interfaces
+```
+
+Define a static element on a different network than 10.10.11.0/24.
+
+```
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+# The primary network interface
+auto eth0
+iface eth0 inet static
+   address 192.168.5.2
+   netmask 255.255.255.0
+   network 192.168.5.0
+   gateway 10.10.11.1
+   dns-nameservers 10.10.11.1
+```
+
+Reboot.
+
+```bash
+$ sudo reboot now
+```
+
+Login and check for a valid IPv4 interface.
+
+```bash
+$ ifconfig eth0
+eth0      Link encap:Ethernet  HWaddr 52:54:00:10:c4:a8  
+          inet addr:192.168.5.2  Bcast:192.168.5.255  Mask:255.255.255.0
+          inet6 addr: fe80::5054:ff:fe10:c4a8/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+```
+
+Can we ping outside from host2? (No)
+
+```bash
+$ ping -c 3 10.10.11.1
+connect: Network is unreachable
+```
+
+> Note: Adding a default gateway of 10.10.11.1 does not work either.
+
+Shutdown host2.
+
+```bash
+$ sudo shutdown -h now
+```
+
+## Test hosts on ovs-br1 (Openvswitch)
+
+Let's now create a second Openvswitch bridge that is not associated with a physical port. It will use an IP address different than our gateway network, 10.10.11.0.
+
+Open the interfaces file.
+
+```bash
+$ sudo vim /etc/network/interfaces
+```
+
+Append `br1`.
+
+```
+auto br1
+allow-ovs br1
+iface br1 inet static
+        address 192.168.5.1
+        netmask 255.255.255.0
+        ovs_type OVSBridge
+```
+
+Add `br1` to Openvswitch.
+
+```bash
+$ sudo ovs-vsctl add-br br1
+```
+
+Show the Openvswitch interfaces.
+
+```bash
+$ sudo ovs-vsctl show
+261a513a-ccdb-447d-a31b-5c6296eb102b
+    Bridge "br0"
+        Port "vnet0"
+            Interface "vnet0"
+        Port "eth0"
+            Interface "eth0"
+        Port "br0"
+            Interface "br0"
+                type: internal
+    Bridge "br1"
+        Port "br1"
+            Interface "br1"
+                type: internal
+    ovs_version: "2.0.2"
+```
+
+Reboot.
+
+```bash
+$ sudo reboot now
+```
+
+Does br1 have an IP address?
+
+```bash
+$ ifconfig br1
+br1       Link encap:Ethernet  HWaddr 6e:d0:7b:8e:a3:4e  
+          inet addr:192.168.5.1  Bcast:192.168.5.255  Mask:255.255.255.0
+          inet6 addr: fe80::c48b:ceff:fe8e:6465/64 Scope:Link
+          UP BROADCAST RUNNING  MTU:1500  Metric:1
+```
+
+Is it pingable from an outside device? (Yes)
+
+```bash
+$ ping -c 3 192.168.5.1
+PING 192.168.5.1 (192.168.5.1) 56(84) bytes of data.
+64 bytes from 192.168.5.1: icmp_seq=1 ttl=64 time=1.68 ms
+64 bytes from 192.168.5.1: icmp_seq=2 ttl=64 time=0.204 ms
+64 bytes from 192.168.5.1: icmp_seq=3 ttl=64 time=0.116 ms
+
+--- 192.168.5.1 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2000ms
+rtt min/avg/max/mdev = 0.116/0.669/1.687/0.720 ms
+```
+
+---
+
+Create a new libvirt definition for `ovs-br1`.
+
+```bash
+$ vim ~/ovs-br1.xml
+```
+
+Add the following.
+
+```xml
+<network>
+  <name>ovs-br1</name>
+  <forward mode='bridge'/>
+  <bridge name='br1'/>
+  <virtualport type='openvswitch'/>
+</network>
+```
+
+Define `ovs-br1` within libvirt.
+
+```bash
+$ sudo virsh net-define ovs-br1.xml
+Network ovs-br1 defined from ovs-br1.xml
+```
+
+List the virtual networks.
+
+```bash
+$ sudo virsh net-list --all
+ Name                 State      Autostart     Persistent
+----------------------------------------------------------
+ default              inactive   no            yes
+ network80            inactive   no            yes
+ ovs-br0              inactive   no            yes
+```
+
+Set `ovs-br1` to autostart, start it and then show the virtual networks.
+
+```bash
+$ sudo virsh net-autostart ovs-br1
+Network ovs-br1 marked as autostarted
+
+$ sudo virsh net-start ovs-br1
+Network ovs-br1 started
+
+$ sudo virsh net-list --all
+ Name                 State      Autostart     Persistent
+----------------------------------------------------------
+ default              inactive   no            yes
+ network80            inactive   no            yes
+ ovs-br0              active     yes           yes
+ ovs-br1              active     yes           yes
+```
+
+---
+
+Change the libvirt interface definition for host2.
+
+```bash
+$ sudo virsh edit host2
+```
+
+Change the source to `ovs-br1`.
+
+```xml
+<source network='ovs-br1'/>
+```
+
+Start and connect to host2.
+
+```bash
+$ sudo virsh start host2
+$ sudo virsh console host2
+```
+
+Open the interfaces file.
+
+```bash
+$ sudo vim /etc/network/interfaces
+```
+
+Define a static element on a different network than 10.10.11.0/24.
+
+```
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+# The primary network interface
+auto eth0
+iface eth0 inet static
+   address 192.168.5.2
+   netmask 255.255.255.0
+   network 192.168.5.0
+   gateway 192.168.5.1
+   dns-nameservers 10.10.11.1
+```
+
+Reboot.
+
+```bash
+$ sudo reboot now
+```
+
+Log back into `host2`.
+
+What does the routing table look like?
+
+```bash
+$ route
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+default         192.168.5.1     0.0.0.0         UG    0      0        0 eth0
+192.168.5.0     *               255.255.255.0   U     0      0        0 eth0
+```
+
+Ok, that looks good.
+
+Can we ping the hypervisor's br1 interface? (Yes)
+
+```bash
+$ ping -c 3 192.168.5.1
+PING 192.168.5.1 (192.168.5.1) 56(84) bytes of data.
+64 bytes from 192.168.5.1: icmp_seq=1 ttl=64 time=0.919 ms
+64 bytes from 192.168.5.1: icmp_seq=2 ttl=64 time=0.535 ms
+64 bytes from 192.168.5.1: icmp_seq=3 ttl=64 time=0.895 ms
+
+--- 192.168.5.1 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2003ms
+rtt min/avg/max/mdev = 0.535/0.783/0.919/0.175 ms
+```
+
+Can we ping other interfaces on the hypervisor? (Yes)
+
+```bash
+$ ping -c 3 10.10.11.230
+PING 10.10.11.230 (10.10.11.230) 56(84) bytes of data.
+64 bytes from 10.10.11.230: icmp_seq=1 ttl=64 time=0.753 ms
+64 bytes from 10.10.11.230: icmp_seq=2 ttl=64 time=1.06 ms
+64 bytes from 10.10.11.230: icmp_seq=3 ttl=64 time=1.42 ms
+
+--- 10.10.11.230 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2003ms
+rtt min/avg/max/mdev = 0.753/1.082/1.429/0.278 ms
+```
+
+Can we ping our DNS server? (No)
+
+```bash
+$ ping -c 3 10.10.11.1
+PING 10.10.11.1 (10.10.11.1) 56(84) bytes of data.
+
+--- 10.10.11.1 ping statistics ---
+3 packets transmitted, 0 received, 100% packet loss, time 1999ms
+```
+
+---
+
+The reason why `host2` cannot see other IPv4 interfaces beyond the hypervisor level, such as 10.10.11.1, is because the hypervisor does not have port-forwarding enabled. Let's enable port forwarding on Linux and use ufw for [Network Address Translation](https://gist.github.com/kimus/9315140). 
+
+On the hypervisor, see if port forwarding is enabled.
+
+```bash
+$ sysctl net.ipv4.ip_forward
+net.ipv4.ip_forward = 0
+```
+
+Open `sysctl.conf`, so we can permanently change the port forwarding value.
+
+```bash
+$ sudo vim /etc/ufw/sysctl.conf 
+```
+
+Comment in the following line:
+
+```
+net/ipv4/ip_forward=1
+```
+
+> Note: Notice that other entries exist, some to enable IPv6 forwarding and others for Linux to mimic the behavior of routers. We're not setting this Linux machine up to be a router but instead a Virtual Machine hub.
+
+Open the UFW configuration file.
+
+```bash
+$ sudo vim /etc/default/ufw
+```
+
+Change DEFAULT_FORWARD_POLICY to "ACCEPT".
+
+```
+DEFAULT_FORWARD_POLICY="ACCEPT"
+```
+
+Open UFW's iptable before-rules configuration file.
+
+```bash
+$ sudo vim /etc/ufw/before.rules
+```
+
+Before any **filter** rules, add post-routing configurations. For me, these were added at the top of the file, just after the header comments.
+
+```
+# NAT table rules
+*nat
+:POSTROUTING ACCEPT [0:0]
+
+# Forward traffic through eth0 - Change to match you out-interface
+-A POSTROUTING -s 192.168.5.0/24 -o br0 -j MASQUERADE
+
+# don't delete the 'COMMIT' line or these nat table rules won't
+# be processed
+COMMIT
+```
+
+Apply the rules to UFW.
+
+```bash
+$ sudo ufw disable && sudo ufw enable
+```
+
+Log back into `host2`.
+
+Can host2 ping device outside of the hypervisor environment? (Yes)
+
+```bash
+$ ping -c 3 10.10.11.1
+PING 10.10.11.1 (10.10.11.1) 56(84) bytes of data.
+64 bytes from 10.10.11.1: icmp_seq=1 ttl=63 time=1.77 ms
+64 bytes from 10.10.11.1: icmp_seq=2 ttl=63 time=2.06 ms
+64 bytes from 10.10.11.1: icmp_seq=3 ttl=63 time=1.49 ms
+
+--- 10.10.11.1 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2004ms
+rtt min/avg/max/mdev = 1.499/1.779/2.066/0.231 ms
+
+$ ping -c 3 www.google.com
+PING www.google.com (173.194.46.82) 56(84) bytes of data.
+64 bytes from ord08s11-in-f18.1e100.net (173.194.46.82): icmp_seq=1 ttl=51 time=16.1 ms
+64 bytes from ord08s11-in-f18.1e100.net (173.194.46.82): icmp_seq=2 ttl=51 time=17.5 ms
+64 bytes from ord08s11-in-f18.1e100.net (173.194.46.82): icmp_seq=3 ttl=51 time=17.9 ms
+
+--- www.google.com ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2003ms
+rtt min/avg/max/mdev = 16.131/17.192/17.915/0.766 ms
+```
+
+Can external devices ping `host2`, 192.168.5.2? (No)
+
+```bash
+$ ping -c 3 192.168.5.2
+PING 192.168.5.2 (192.168.5.2) 56(84) bytes of data.
+From 10.10.11.1 icmp_seq=1 Destination Host Unreachable
+From 10.10.11.1 icmp_seq=2 Destination Host Unreachable
+From 10.10.11.1 icmp_seq=3 Destination Host Unreachable
+
+--- 192.168.5.2 ping statistics ---
+3 packets transmitted, 0 received, +3 errors, 100% packet loss, time 2014ms
+```
+
+From an external device, use nmap to see which ports are even open on one of the hypervisor network interfaces.
+
+```bash
+$ nmap -Pn 192.168.5.1
+
+Starting Nmap 6.40 ( http://nmap.org ) at 2014-11-23 17:56 CST
+Nmap scan report for 192.168.5.1
+Host is up (0.00082s latency).
+Not shown: 999 filtered ports
+PORT   STATE SERVICE
+22/tcp open  ssh
+
+Nmap done: 1 IP address (1 host up) scanned in 6.54 seconds
+```
+
+Back on the hypervisor are there other ports that should have been scanned by `nmap` if the firewall had not been enabled?  (Yes)  In fact, I have an DNS server running on all hypervisor root interface ports.
+
+```bash
+$ sudo netstat -ntulp | grep LISTEN
+tcp        0      0 192.168.5.1:53          0.0.0.0:*               LISTEN      1530/named      
+tcp        0      0 10.10.11.230:53         0.0.0.0:*               LISTEN      1530/named      
+tcp        0      0 127.0.0.1:53            0.0.0.0:*               LISTEN      1530/named      
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      1457/sshd       
+tcp        0      0 127.0.0.1:953           0.0.0.0:*               LISTEN      1530/named      
+tcp6       0      0 :::53                   :::*                    LISTEN      1530/named      
+tcp6       0      0 :::22                   :::*                    LISTEN      1457/sshd       
+tcp6       0      0 ::1:953                 :::*                    LISTEN      1530/named
+```
+
+---
+
+`host2` has a web-server that we want to access. Let's port forward any IPv4 HTTP (port 80) requests for 192.168.5.1 to 192.168.5.2.
+
+Open UFW's iptable before-rules configuration file.
+
+```bash
+$ sudo vim /etc/ufw/before.rules
+```
+
+Add "Destination Network Address Translation" (DNAT) rules.
+
+```
+# NAT table rules
+*nat
+:PREROUTING ACCEPT [0:0]
+:POSTROUTING ACCEPT [0:0]
+
+# Port Forwardings
+-A PREROUTING -i br0 -p tcp --dport 80 -j DNAT --to-destination 192.168.5.2
+
+# Forward traffic through eth0 - Change to match you out-interface (eth0?)
+-A POSTROUTING -s 192.168.5.0/24 -o br0 -j MASQUERADE
+
+# don't delete the 'COMMIT' line or these nat table rules won't
+# be processed
+COMMIT
+```
+
+Refresh UFW.
+
+```bash
+$ sudo ufw disable && sudo ufw enable
+```
+
+In a web-browser on a different device than the hypervisor machine, navigate to "http://192.168.5.1/".
+
+```
+http://192.168.5.1/
+```
+
+> Note: Notice both 192.168.5.1 AND 10.10.11.230 will undergo DNAT to point to the same host2 web-server.
+
+
