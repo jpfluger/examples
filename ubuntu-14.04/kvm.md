@@ -26,6 +26,8 @@ We will cover:
 * Test hosts on network77 (bridged)
 * Test hosts on ovs-br0 (Openvswitch)
 * Test hosts on ovs-br1 (Openvswitch)
+* Add a Juniper vSRX "Firefly" host (Openvswitch)
+* Add a Juniper vSRX "Firefly" host (bridged)
 
 ## My test system
 
@@ -3319,4 +3321,566 @@ http://192.168.5.1/
 
 > Note: Notice both 192.168.5.1 AND 10.10.11.230 will undergo DNAT to point to the same host2 web-server.
 
+## Add a Juniper vSRX "Firefly" host (Openvswitch)
 
+Below are my tests for Juniper's [vSRX on KVM](http://www.juniper.net/techpubs/en_US/firefly12.1x46-d10/topics/task/installation/security-virtual-perimeter-with-kvm-installing.html).My tests use Openvswitch networks for the network interfaces passed into Juniper's Virtual SRX (Firefly) setup script. 
+
+---
+
+Let's first prepare the hypervisor for these tests. 
+
+On the hypervisor, let's add a 3rd bridge (ovs-br2). Open the `interfaces` file.
+
+```bash
+$ sudo vim /etc/network/interfaces
+```
+
+Append br2.
+
+```
+auto br2
+allow-ovs br2
+iface br2 inet static
+        address 192.168.6.1
+        netmask 255.255.255.0
+        ovs_type OVSBridge
+```
+
+Add to Openvswitch.
+
+```bash
+$ sudo ovs-vsctl add-br br2
+```
+
+Reboot.
+
+``bash
+$ sudo reboot now
+```
+
+Login to the hypervisor and verify the IP assignment of br2.
+
+```bash
+$ ifconfig br2
+br2       Link encap:Ethernet  HWaddr ba:e5:20:7e:97:42  
+          inet addr:192.168.6.1  Bcast:192.168.6.255  Mask:255.255.255.0
+          inet6 addr: fe80::9024:27ff:fe9d:afb1/64 Scope:Link
+          UP BROADCAST RUNNING  MTU:1500  Metric:1
+```
+
+Verify it shows in Openvswitch.
+
+```bash
+$ sudo ovs-vsctl show
+261a513a-ccdb-447d-a31b-5c6296eb102b
+    Bridge "br0"
+        Port "vnet1"
+            Interface "vnet1"
+        Port "eth0"
+            Interface "eth0"
+        Port "br0"
+            Interface "br0"
+                type: internal
+    Bridge "br2"
+        Port "br2"
+            Interface "br2"
+                type: internal
+    Bridge "br1"
+        Port "br1"
+            Interface "br1"
+                type: internal
+    ovs_version: "2.0.2"
+```
+
+Create a new libvirt network template file for `ovs-br2`.
+
+```bash
+$ vim ~/ovs-br2.xml
+```
+
+Edit it.
+
+```xml
+<network>
+  <name>ovs-br2</name>
+  <forward mode='bridge'/>
+  <bridge name='br2'/>
+  <virtualport type='openvswitch'/>
+</network>
+```
+
+Define it in libvirt.
+
+```bash
+$ sudo virsh net-define ovs-br2.xml
+Network ovs-br2 defined from ovs-br2.xml
+```
+
+Set `ovs-br2` to autostart, start it and then show the virtual networks.
+
+```bash
+$ sudo virsh net-autostart ovs-br2
+Network ovs-br2 marked as autostarted
+
+$ sudo virsh net-start ovs-br2
+Network ovs-br2 started
+
+$ sudo virsh net-list --all
+ Name                 State      Autostart     Persistent
+----------------------------------------------------------
+ default              inactive   no            yes
+ network80            inactive   no            yes
+ ovs-br0              active     yes           yes
+ ovs-br1              active     yes           yes
+ ovs-br2              active     yes           yes
+```
+
+---
+
+What storage pools are available, where new vSRX image files can be allocated?
+
+```bash
+$ sudo virsh pool-list --all
+ Name                 State      Autostart 
+-------------------------------------------
+ pool0                active     yes       
+```
+
+Recall that `pool0` points to `/var/kvm/images`.
+
+```bash
+$ sudo ls -l /var/kvm/images/
+total 12583252
+-rw------- 1 libvirt-qemu kvm  4294971392 Nov 23 15:56 host1.img
+-rw------- 1 root         root 4294971392 Nov 23 18:21 host2.img
+-rw------- 1 root         root 4294967296 Nov  3 03:52 template2.img
+```
+
+What are our virtual networks?
+
+```bash
+$ sudo virsh net-list --all
+ Name                 State      Autostart     Persistent
+----------------------------------------------------------
+ default              inactive   no            yes
+ network80            inactive   no            yes
+ ovs-br0              active     yes           yes
+ ovs-br1              active     yes           yes
+ ovs-br2              active     yes           yes
+```
+
+Download the vSRX install package. Directions for doing this are [found here](http://www.juniper.net/techpubs/en_US/firefly12.1x46-d10/topics/task/installation/security-virtual-perimeter-with-kvm-installing.html).
+
+The following command invokes bash againsts the Juniper vSRX setup script. JSRX1 is the name of the new virtual machine. The storage pool is pool0. The `-i` parameter designates our network setup in the format of "<number>:<driver type>:<virtual networks>". In our command below, we create 4 virtual network interface cards (vNICs) of type virtio that reside on virtual networks (vNETs) "ovs-br0" and "ovs-br1". The first vNET (ovs-br0) is assigned 1 vNIC. The second vNET (ovs-br1) is assigned to the 2nd vNIC. The remaining 2 vNICs get auto-assigned to the last vNET in the list (ovs-br2).
+
+```bash
+sudo bash junos-vsrx-12.1X47-D10.4-domestic.jva JSRX1 -s pool0 -i 4:virtio:ovs-br0,ovs-br1,ovs-br2
+
+# ACCEPT LICENSE AGREEMENT (y/n)
+
+Extracting ...
+
+Checking existence of VM JSRX1 ...
+HOST = , storage = pool0, vm_name = JSRX1, img = junos-vsrx-12.1X47-D10.4-domestic-1408122276/junos-vsrx-12.1X47-D10.4-domestic.img
+Checking existence of storage pool pool0 ...
+ pool0                active     yes       
+Getting storage path ...
+Storage path: /var/kvm/images
+/home/avatar/junos-vsrx-12.1X47-D10.4-domestic-1408122276
+SHA1(junos-vsrx-12.1X47-D10.4-domestic.img)= d326b7366cb8f30141118ba7c261060fe97fe26c
+-rw-r--r-- 1 17105 950 266M Aug 15 12:05 junos-vsrx-12.1X47-D10.4-domestic-1408122276/junos-vsrx-12.1X47-D10.4-domestic.img
+cp junos-vsrx-12.1X47-D10.4-domestic-1408122276/junos-vsrx-12.1X47-D10.4-domestic.img /var/kvm/images/JSRX1.img
+Checking host CPU features ...
+Creating VM on the host ...
+error: Failed to define domain from JSRX1.xml
+error: Cannot check QEMU binary /usr/libexec/qemu-kvm: No such file or directory
+
+Checking the VM ...
+```
+
+A couple of errors occured. Let's fix them now.
+
+A new file called "JSRX1.xml" should have been created in the directory where the script was executed. Open it.
+
+```bash
+$ sudo vim JSRX1.xml
+```
+
+The emulator element is defined for Red Hat and not Debian/Ubuntu. Change the path to the kvm executable.
+
+```xml
+<emulator>/usr/bin/kvm</emulator>
+```
+
+Also, the Juniper vSRX directions are wrong. The last vNIC was assigned to a "default" vNET but it was supposed to be assigned to `ovs-br2`.
+
+```xml
+<source network='ovs-br2'/>
+```
+
+Notice the actual image file has already been created within the pool0 directory.
+
+```bash
+$ sudo ls -l /var/kvm/images/
+total 12855380
+-rw------- 1 libvirt-qemu kvm  4294971392 Nov 23 15:56 host1.img
+-rw------- 1 root         root 4294971392 Nov 23 18:21 host2.img
+-rw-r--r-- 1        17105  950  278659072 Aug 15 12:05 JSRX1.img
+-rw------- 1 root         root 4294967296 Nov  3 03:52 template2.img
+```
+
+Which means all we have left is to define the JSRX1 domain within libvirt.
+
+```bash
+$ sudo virsh define JSRX1.xml
+Domain JSRX1 defined from JSRX1.xml
+```
+
+View all defined hosts.
+
+```bash
+$ sudo virsh list --all
+ Id    Name                           State
+----------------------------------------------------
+ -     host1                          shut off
+ -     host2                          shut off
+ -     JSRX1                          shut off
+ -     template2                      shut off
+```
+
+Start JSRX1.
+
+```bash
+$ sudo virsh start JSRX1
+Domain JSRX1 started
+```
+
+Connect to it and use "root" for the login.
+
+```bash
+$ sudo virsh console JSRX1
+Connected to domain JSRX1
+Escape character is ^]
+
+
+Amnesiac (ttyd0)
+
+login: root 
+
+--- JUNOS 12.1X47-D10.4 built 2014-08-14 22:59:01 UTC
+root@% 
+```
+
+Juniper vSRX will give a `root@%` prompt. See this knowlege-base [page](http://kb.juniper.net/InfoCenter/index?page=content&id=KB16580) for help on getting started.
+
+---
+
+Back on the hypervisor, show the interfaces associated with Openvswitch.
+
+```bash
+$ sudo ovs-vsctl show
+261a513a-ccdb-447d-a31b-5c6296eb102b
+    Bridge "br0"
+        Port "vnet0"
+            Interface "vnet0"
+        Port "eth0"
+            Interface "eth0"
+        Port "br0"
+            Interface "br0"
+                type: internal
+    Bridge "br2"
+        Port "br2"
+            Interface "br2"
+                type: internal
+        Port "vnet2"
+            Interface "vnet2"
+        Port "vnet3"
+            Interface "vnet3"
+    Bridge "br1"
+        Port "vnet1"
+            Interface "vnet1"
+        Port "br1"
+            Interface "br1"
+                type: internal
+    ovs_version: "2.0.2"
+```
+
+## Add a Juniper vSRX "Firefly" host (bridged)
+
+On a hypervisor, open the `interfaces` file.
+
+```bash
+$ sudo vim /etc/network/interfaces
+```
+
+Define eth0, br0 and br1. Notice br0 and br1 don't set a default port.
+
+```
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+# The primary network interface
+auto eth0
+iface eth0 inet dhcp
+
+# The bridge interface
+auto br0
+iface br0 inet static
+   address 10.10.11.1
+   network 10.10.11.0
+   netmask 255.255.255.0
+   bridge_ports none
+   bridge_stp on
+   bridge_fd 0
+   bridge_maxwait 0
+
+auto br1
+iface br1 inet static
+   address 10.10.15.1
+   network 10.10.15.0
+   netmask 255.255.255.0
+   bridge_ports none
+   bridge_stp on
+   bridge_fd 0
+   bridge_maxwait 0
+```
+
+Enable port-forwarding for the hypervisor.  Open `sysctl.conf`.
+
+```bash
+$ sudo vim /etc/ufw/sysctl.conf 
+```
+
+Uncomment the following:
+
+```
+net/ipv4/ip_forward=1
+net/ipv6/conf/default/forwarding=1
+net/ipv6/conf/all/forwarding=1
+```
+
+> Note: Notice that other entries exist, some to enable IPv6 forwarding and others for Linux to mimic the behavior of routers. We're not setting this Linux machine up to be a router but instead a Virtual Machine hub.
+
+Open the UFW configuration file.
+
+```bash
+$ sudo vim /etc/default/ufw
+```
+
+Change DEFAULT_FORWARD_POLICY to "ACCEPT".
+
+```
+DEFAULT_FORWARD_POLICY="ACCEPT"
+```
+
+Open UFW's iptable before-rules configuration file.
+
+```bash
+$ sudo vim /etc/ufw/before.rules
+```
+
+Before any **filter** rules, add post-routing configurations. For me, these were added at the top of the file, just after the header comments.
+
+```
+# NAT table rules
+*nat
+:POSTROUTING ACCEPT [0:0]
+
+# Forward traffic through eth0 - Change to match you out-interface
+-A POSTROUTING -s 10.10.11.0/24 -o br0 -j MASQUERADE
+# The 10.10.15.0 network is used to test virtual routers and the router should handle the forwarding
+#-A POSTROUTING -s 10.10.15.0/24 -o br0 -j MASQUERADE
+
+# don't delete the 'COMMIT' line or these nat table rules won't
+# be processed
+COMMIT
+```
+
+Apply the rules to UFW.
+
+```bash
+$ sudo ufw disable && sudo ufw enable
+```
+
+Reboot. The restart should come up quickly and not pause to bring up networking.
+
+```bash
+$ sudo reboot now
+```
+
+Create templates for two new libvirt virtual networks based on the Linux bridges.
+
+```bash
+$ sudo vim netbr0.xml
+```
+
+Fill with this xml.
+
+```xml
+<network>
+  <name>netbr0</name>
+  <forward mode='bridge'/>
+  <bridge name='br0'/>
+</network>
+```
+
+And for netbr1.
+
+```bash
+$ sudo vim netbr1.xml
+```
+
+Copy in this.
+
+```xml
+<network>
+  <name>netbr1</name>
+  <forward mode='bridge'/>
+  <bridge name='br1'/>
+</network>
+```
+
+Define both netbr0 and netbr1 within libvirt.
+
+```bash
+$ sudo virsh net-define netbr0.xml
+$ sudo virsh net-define netbr1.xml
+```
+
+Set the two networks to autostart.
+
+```bash
+$ sudo virsh net-autostart netbr0
+$ sudo virsh net-autostart netbr1
+```
+
+Start both networks.
+
+```bash
+$ sudo virsh net-start netbr0
+$ sudo virsh net-start netbr1
+```
+
+List the networks.
+
+```bash
+$ sudo virsh net-list --all
+ Name                 State      Autostart     Persistent
+----------------------------------------------------------
+ netbr0               active     yes           yes
+ netbr1               active     yes           yes
+```
+
+List the storage pools.
+
+```bash
+$ sudo virsh pool-list --all
+ Name                 State      Autostart 
+-------------------------------------------
+ default              active     yes      
+```
+
+Download the vSRX install package. Directions for doing this are [found here](http://www.juniper.net/techpubs/en_US/firefly12.1x46-d10/topics/task/installation/security-virtual-perimeter-with-kvm-installing.html).
+
+The following command invokes bash againsts the Juniper vSRX setup script. JSRX1 is the name of the new virtual machine. The storage pool is pool0. The `-i` parameter designates our network setup in the format of "<number>:<driver type>:<virtual networks>". In our command below, we create 4 virtual network interface cards (vNICs) of type virtio that reside on virtual networks (vNETs) "ovs-br0" and "ovs-br1". The first vNET (ovs-br0) is assigned 1 vNIC. The second vNET (ovs-br1) is assigned to the 2nd vNIC. The remaining 2 vNICs get auto-assigned to the last vNET in the list (ovs-br2).
+
+```bash
+sudo bash junos-vsrx-12.1X47-D10.4-domestic.jva JSRX1 -s ciderscratch-kvms -i 3:virtio:netbr0,netbr1
+# LICENSE HERE
+Accept?[y/n]y
+Extracting ...
+Checking existence of VM JSRX1 ...
+HOST = , storage = ciderscratch-kvms, vm_name = JSRX1, img = junos-vsrx-12.1X47-D10.4-domestic-1408122276/junos-vsrx-12.1X47-D10.4-domestic.img
+Checking existence of storage pool ciderscratch-kvms ...
+ ciderscratch-kvms    active     yes       
+Getting storage path ...
+Storage path: /ciderscratch/vms/kvm
+/cidershare/lib/juniper/vSRX/junos-vsrx-12.1X47-D10.4-domestic-1408122276
+SHA1(junos-vsrx-12.1X47-D10.4-domestic.img)= d326b7366cb8f30141118ba7c261060fe97fe26c
+-rw-r--r-- 1 17105 950 266M Aug 15 12:05 junos-vsrx-12.1X47-D10.4-domestic-1408122276/junos-vsrx-12.1X47-D10.4-domestic.img
+cp junos-vsrx-12.1X47-D10.4-domestic-1408122276/junos-vsrx-12.1X47-D10.4-domestic.img /ciderscratch/vms/kvm/JSRX1.img
+Checking host CPU features ...
+Creating VM on the host ...
+error: Failed to define domain from JSRX1.xml
+error: Cannot check QEMU binary /usr/libexec/qemu-kvm: No such file or directory
+
+Checking the VM ...
+```
+
+Let's fix the errors. Open the template file that was created.
+
+```bash
+$ sudo vim JSRX1.xml
+```
+
+The emulator element is defined for Red Hat and not Debian/Ubuntu. Change the path to the kvm executable.
+
+```xml
+<emulator>/usr/bin/kvm</emulator>
+```
+
+The Juniper vSRX [installation directions](http://www.juniper.net/techpubs/en_US/firefly12.1x46-d10/topics/task/installation/security-virtual-perimeter-with-kvm-installing.html) are wrong. The last vNIC was assigned to a "default" vNET but it was supposed to be assigned to `netbr1`.
+
+```xml
+<source network='netbr1'/>
+```
+
+Define JSRX1 within libvirt.
+
+```bash
+$ sudo virsh define JSRX1.xml
+```
+
+List hosts.
+
+```bash
+$ sudo virsh list --all
+ Id    Name                           State
+----------------------------------------------------
+ -     JSRX1                          shut off
+```
+
+Run the vSRX instance.
+
+```bash
+$ sudo virsh start JSRX1
+Domain JSRX1 started
+```
+
+Connect to JSRX1. The login is "root". 
+
+```bash
+$ sudo virsh console JSRX1
+Escape character is ^]
+
+
+Amnesiac (ttyd0)
+
+login: root
+
+--- JUNOS 12.1X47-D10.4 built 2014-08-14 22:59:01 UTC
+root@%
+```
+
+Type `cli` to shift from the shell prompt (root@%) into operational mode (root>). More directions can be found in the Juniper [knowledge base](http://kb.juniper.net/InfoCenter/index?page=content&id=KB16580).
+
+```
+root@% cli
+root> help
+```
+
+Shutdown the vSRX gracefully. In cli mode, run:
+
+```
+root> request system power-off
+```
+
+Verify shutdown.
+
+```bash
+$ sudo virsh list --all
+ Id    Name                           State
+----------------------------------------------------
+ -     JSRX1                          shut off
+```
