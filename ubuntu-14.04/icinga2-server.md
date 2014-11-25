@@ -28,6 +28,9 @@ This example will be covering the following:
 * [Tests](#tests)
 * [Ping a 2nd Host and Additional Configurations](#ping-a-2nd-host-and-additional-configurations)
 * [My Default Setup (for comparison)](#my-default-setup-for-comparison)
+* [Updates to Icinga2](#updates-to-icigna2)
+* [Setup HTTP API](#setup-http-api)
+* [Parameters for Icinga Web API](#parameters-for-icinga-web-api)
 
 I chose Icinga instead of Nagios because I wanted to integrate with Postgres. Also the web-interface is slick and, since Icinga is a fork of Nagios, plugins developed for Nagios work in Icinga.
 
@@ -1092,4 +1095,472 @@ Quit from postgres with the `\q` command.
 
 ```sql
 postgres=# \q
+```
+
+## Updates to Icinga2
+
+The Icinga2 packages for Ubuntu were recently updated, so wanted to upgrade. I found the upgrade process broke my installation. Here is how I fixed it.
+
+``bash
+$ sudo apt-get upgrade
+```
+
+Manually update the database. Update scripts were not installed with the ubuntu package but I did find them on the [Icinga2 GitHub](https://github.com/Icinga/icinga2) repository, particulary in the Postgres [schema upgrade directory](https://github.com/Icinga/icinga2/tree/master/lib/db_ido_pgsql/schema/upgrade).
+
+Login to postgres.
+
+```bash
+$ sudo -u postgres psql
+```
+
+Connect to Icinga2 and see which version of Icinga database is running.
+
+```sql
+postgres=# \c icinga
+You are now connected to database "icinga" as user "postgres".
+icinga=# select * from icinga_dbversion;
+ dbversion_id |   name   | version |          create_time          |          modify_time          
+--------------+----------+---------+-------------------------------+-------------------------------
+            1 | idoutils | 1.11.7  | 2014-10-24 14:20:38.606363-05 | 2014-10-24 14:20:38.606363-05
+```
+
+The [2.2.0.sql](https://github.com/Icinga/icinga2/blob/master/lib/db_ido_pgsql/schema/upgrade/2.2.0.sql) script should be run in order to complete the database upgrade.
+
+```sql
+-- -----------------------------------------
+-- upgrade path for Icinga 2.2.0
+--
+-- -----------------------------------------
+-- Copyright (c) 2014 Icinga Development Team (http://www.icinga.org)
+--
+-- Please check http://docs.icinga.org for upgrading information!
+-- -----------------------------------------
+
+ALTER TABLE icinga_programstatus ADD COLUMN program_version TEXT default NULL;
+
+ALTER TABLE icinga_customvariables ADD COLUMN is_json INTEGER default 0;
+ALTER TABLE icinga_customvariablestatus ADD COLUMN is_json INTEGER default 0;
+
+
+-- -----------------------------------------
+-- update dbversion
+-- -----------------------------------------
+
+SELECT updatedbversion('1.12.0');
+```
+
+Exit postgres.
+
+```sql
+icinga=# \q
+```
+
+Restart Icinga2.
+
+```bash
+$ sudo service icinga2 restart
+```
+
+## Setup HTTP API
+
+According to the [online Icinga-Web documents](http://docs.icinga.org/latest/en/icinga-web-api.html), verify the setup already enabled API usage.
+
+Open `auth.xml`.
+
+```bash
+$ sudo vim /usr/share/icinga-web/app/modules/AppKit/config/auth.xml
+```
+
+The following section should already be commented in and enabled. If it isn't, then comment it in and enable it.
+
+```xml
+<!--
+    * api key
+    Providing user defined api key in the url to authenticate as fast as possible
+    Also please change anything ;-)
+-->
+<ae:parameter name="auth_key">
+    <ae:parameter name="auth_module">AppKit</ae:parameter>
+    <ae:parameter name="auth_provider">Auth.Provider.AuthKey</ae:parameter>
+    <ae:parameter name="auth_enable">true</ae:parameter>
+    <ae:parameter name="auth_authoritative">true</ae:parameter>
+</ae:parameter>
+```
+
+If the file changed, then also clear the web-cache.
+
+```bash
+$ sudo /usr/share/icinga-web/bin/clearcache.sh
+```
+
+Login to Icinga-Web.  On the top-left of the window, you'll see an `Admin` menu. Click the `Users` sub-menu item. 
+
+To create a user that has access using the API:
+
+  1. Click the "Add New User" button
+  2. Fields
+    * username: api-ps
+    * name: API
+    * surname: Process
+    * email: api-ps@example.com
+    * Auth via: auth_key
+    * Auth key for API: api-ps-12345
+    * (SAVE)
+  3. On the right-tab, click "Rights" then "Credentials"
+    * checkmark true "appkit.api.access"
+    * (SAVE)
+
+Let's try a GET request that will pull all services that are ["critical or warning, but have a host that is ok"](http://docs.icinga.org/latest/en/icinga-web-api.html#getexample) and format the results as **json**.
+
+In a web-browser, paste the following but remember to change to your settings:
+
+  * host: icinga.example.com
+  * authkey: api-ps-12345
+  * json (or for xml, replace with "xml")
+
+```
+http://icinga.example.com/icinga-web/web/api/service/filter[AND(HOST_CURRENT_STATE|=|0;OR(SERVICE_CURRENT_STATE|=|1;SERVICE_CURRENT_STATE|=|2))]/
+columns[SERVICE_NAME|HOST_NAME|SERVICE_CURRENT_STATE|HOST_NAME|HOST_CURRENT_STATE|HOSTGROUP_NAME]/
+order(SERVICE_CURRENT_STATE;DESC)/countColumn=SERVICE_ID/authkey=api-ps-12345/json
+```
+
+As the online docs tell us, the [structure of the url](http://docs.icinga.org/latest/en/icinga-web-api.html#geturlstructure) has required and optional elements. The required elements are in bold.
+
+example.com/icinga-web/web/api/ **TARGET** / **COLUMNS** / FILTER / ORDER / GROUPING / LIMIT / COUNTFIELD / **OUTPUT_TYPE**
+
+The [parameters](http://docs.icinga.org/latest/en/icinga-web-api.html#getparamdetails)
+
+Here are a few more examples.
+
+Get all hosts being monitored with the current state.
+
+```
+http://icinga.example.com/icinga-web/web/api/host/filter/columns[HOST_NAME|HOST_CURRENT_STATE])/authkey=api-ps-12345/json
+```
+
+Returns.
+
+```json
+{
+  "result":[
+    {"HOST_NAME":"localhost","HOST_CURRENT_STATE":0,"HOST_IS_PENDING":0}
+  ],
+  "success":"true"
+}
+```
+
+Get all services being monitored.
+
+http://icinga.example.com/icinga-web/web/api/service/filter/columns[SERVICE_NAME|HOST_NAME]/authkey=api-ps-12345/json
+
+```json
+{
+  "result":[
+    {"SERVICE_NAME":"load","HOST_NAME":"localhost"},
+    {"SERVICE_NAME":"apt","HOST_NAME":"localhost"},
+    {"SERVICE_NAME":"http","HOST_NAME":"localhost"},
+    {"SERVICE_NAME":"users","HOST_NAME":"localhost"},
+    {"SERVICE_NAME":"swap","HOST_NAME":"localhost"},
+    {"SERVICE_NAME":"disk","HOST_NAME":"localhost"},
+    {"SERVICE_NAME":"ping4","HOST_NAME":"localhost"},
+    {"SERVICE_NAME":"ssh","HOST_NAME":"localhost"},
+    {"SERVICE_NAME":"procs","HOST_NAME":"localhost"},
+    {"SERVICE_NAME":"ping6","HOST_NAME":"localhost"},
+    {"SERVICE_NAME":"icinga","HOST_NAME":"localhost"}],
+  "success":"true"
+}
+```
+
+Here's a more detailed list showing the two custom variables, "os" and "sla", for a single host.
+
+```
+http://icinga.example.com/icinga-web/web/api/host/filter/columns[SERVICE_NAME|HOST_NAME|SERVICE_CURRENT_STATE|HOST_NAME|HOST_ADDRESS|HOST_CUSTOMVARIABLE_NAME|HOST_CUSTOMVARIABLE_VALUE|HOST_CURRENT_STATE|HOSTGROUP_NAME])/authkey=api-ps-12345/json
+```
+
+Results.
+
+```json
+{
+  "result":[
+    {"HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"os","HOST_CUSTOMVARIABLE_VALUE":"Linux","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"sla","HOST_CUSTOMVARIABLE_VALUE":"24x7","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0}],
+  "success":"true"
+}
+```
+
+Or by service.
+
+```
+http://icinga.example.com/icinga-web/web/api/service/filter/columns[SERVICE_NAME|HOST_NAME|SERVICE_CURRENT_STATE|HOST_NAME|HOST_ADDRESS|HOST_CUSTOMVARIABLE_NAME|HOST_CUSTOMVARIABLE_VALUE|HOST_CURRENT_STATE|HOSTGROUP_NAME]/authkey=api-ps-12345/json
+```
+
+Results.
+
+```json
+{
+  "result":[
+    {"SERVICE_NAME":"load","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"os","HOST_CUSTOMVARIABLE_VALUE":"Linux","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"swap","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"os","HOST_CUSTOMVARIABLE_VALUE":"Linux","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"ping4","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"sla","HOST_CUSTOMVARIABLE_VALUE":"24x7","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"ssh","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"sla","HOST_CUSTOMVARIABLE_VALUE":"24x7","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"http","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"sla","HOST_CUSTOMVARIABLE_VALUE":"24x7","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"apt","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"os","HOST_CUSTOMVARIABLE_VALUE":"Linux","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"ping6","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"sla","HOST_CUSTOMVARIABLE_VALUE":"24x7","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"disk","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"sla","HOST_CUSTOMVARIABLE_VALUE":"24x7","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"procs","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"sla","HOST_CUSTOMVARIABLE_VALUE":"24x7","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"users","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"os","HOST_CUSTOMVARIABLE_VALUE":"Linux","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"icinga","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"sla","HOST_CUSTOMVARIABLE_VALUE":"24x7","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"apt","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"sla","HOST_CUSTOMVARIABLE_VALUE":"24x7","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"ssh","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"os","HOST_CUSTOMVARIABLE_VALUE":"Linux","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"ping4","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"os","HOST_CUSTOMVARIABLE_VALUE":"Linux","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"http","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"os","HOST_CUSTOMVARIABLE_VALUE":"Linux","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"swap","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"sla","HOST_CUSTOMVARIABLE_VALUE":"24x7","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"load","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"sla","HOST_CUSTOMVARIABLE_VALUE":"24x7","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"procs","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"os","HOST_CUSTOMVARIABLE_VALUE":"Linux","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"users","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"sla","HOST_CUSTOMVARIABLE_VALUE":"24x7","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"icinga","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"os","HOST_CUSTOMVARIABLE_VALUE":"Linux","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"disk","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"os","HOST_CUSTOMVARIABLE_VALUE":"Linux","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"ping6","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"os","HOST_CUSTOMVARIABLE_VALUE":"Linux","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0}],
+  "success":"true"
+}
+```
+
+Or filter on the hosts by Custom Variable Name.
+
+```
+http://icinga.example.com/icinga-web/web/api/host/filter[AND(HOST_CUSTOMVARIABLE_NAME|=|os;AND(HOST_CUSTOMVARIABLE_VALUE|=|Linux))]/columns[SERVICE_NAME|HOST_NAME|SERVICE_CURRENT_STATE|HOST_NAME|HOST_ADDRESS|HOST_CUSTOMVARIABLE_NAME|HOST_CUSTOMVARIABLE_VALUE|HOST_CURRENT_STATE|HOSTGROUP_NAME]/authkey=api-ps-12345/json
+```
+
+Results.
+
+```json
+{
+  "result":[
+    {"HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"os","HOST_CUSTOMVARIABLE_VALUE":"Linux","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0}],
+  "success":"true"
+}
+```
+
+Or only change **/host/** to **/service/** to search all services.
+
+```
+http://icinga.example.com/icinga-web/web/api/service/filter[AND(HOST_CUSTOMVARIABLE_NAME|=|os;AND(HOST_CUSTOMVARIABLE_VALUE|=|Linux))]/columns[SERVICE_NAME|HOST_NAME|SERVICE_CURRENT_STATE|HOST_NAME|HOST_ADDRESS|HOST_CUSTOMVARIABLE_NAME|HOST_CUSTOMVARIABLE_VALUE|HOST_CURRENT_STATE|HOSTGROUP_NAME]/authkey=api-ps-12345/json
+```
+
+Results.
+
+```json
+{
+  "result":[
+    {"SERVICE_NAME":"disk","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"os","HOST_CUSTOMVARIABLE_VALUE":"Linux","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"procs","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"os","HOST_CUSTOMVARIABLE_VALUE":"Linux","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"icinga","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"os","HOST_CUSTOMVARIABLE_VALUE":"Linux","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"swap","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"os","HOST_CUSTOMVARIABLE_VALUE":"Linux","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"apt","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"os","HOST_CUSTOMVARIABLE_VALUE":"Linux","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"load","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"os","HOST_CUSTOMVARIABLE_VALUE":"Linux","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"http","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"os","HOST_CUSTOMVARIABLE_VALUE":"Linux","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"ssh","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"os","HOST_CUSTOMVARIABLE_VALUE":"Linux","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"users","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"os","HOST_CUSTOMVARIABLE_VALUE":"Linux","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"ping4","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"os","HOST_CUSTOMVARIABLE_VALUE":"Linux","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0},
+    {"SERVICE_NAME":"ping6","HOST_NAME":"localhost","SERVICE_CURRENT_STATE":0,"HOST_ADDRESS":"127.0.0.1","HOST_CUSTOMVARIABLE_NAME":"os","HOST_CUSTOMVARIABLE_VALUE":"Linux","HOST_CURRENT_STATE":0,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0}],
+  "success":"true"
+}
+```
+
+---
+
+Time for some summary requests.
+
+Find hosts that are "UP" and where the current state of services is not "OK".
+
+```
+http://icinga.example.com/icinga-web/web/api/service/filter[AND(HOST_CURRENT_STATE|=|0;OR(SERVICE_CURRENT_STATE|=|1;SERVICE_CURRENT_STATE|=|2))]/
+columns[SERVICE_NAME|HOST_NAME|SERVICE_CURRENT_STATE|HOST_NAME|HOST_CURRENT_STATE|HOSTGROUP_NAME]/
+order(SERVICE_CURRENT_STATE;DESC)/countColumn=SERVICE_ID/authkey=api-ps-12345/json
+```
+
+Results are good.
+
+```json
+{
+  "result":[],
+  "success":"true",
+  "total":0
+}
+```
+
+Let's create a new host that is designed to fail.
+
+```bash
+$ sudo cp /etc/icinga2/conf.d/hosts/localhost.conf /etc/icinga2/conf.d/hosts/test.conf
+$ sudo vim /etc/icinga2/conf.d/hosts/test.conf
+```
+
+And add an address property inside the service definition.
+
+```
+object Host "test" {
+  import "generic-host"
+
+  address = "192.168.200.200"
+
+  vars.os = "Linux"
+  vars.sla = "24x7"
+}
+```
+
+Reload Icinga2.
+
+```bash
+$ sudo service icinga2 reload
+```
+
+Wait a few minutes until Icinga2 can run its checks. I suggest logging into the Icinga Web and viewing status entries from there.
+
+Now run the same GET request we did above.
+
+```
+http://icinga.example.com/icinga-web/web/api/service/filter[AND(HOST_CURRENT_STATE|=|0;OR(SERVICE_CURRENT_STATE|=|1;SERVICE_CURRENT_STATE|=|2))]/
+columns[SERVICE_NAME|HOST_NAME|SERVICE_CURRENT_STATE|HOST_NAME|HOST_CURRENT_STATE|HOSTGROUP_NAME]/
+order(SERVICE_CURRENT_STATE;DESC)/countColumn=SERVICE_ID/authkey=api-ps-12345/json
+```
+
+The results were not expected. We should see a host and services that are critical and down.
+
+```json
+{
+  "result":[],
+  "success":"true",
+  "total":0
+}
+```
+
+A better test is to change the HOST_CURRENT_STATE comparison operator to `>=`. 
+
+```
+http://icinga.example.com/icinga-web/web/api/service/filter[AND(HOST_CURRENT_STATE|>=|0;OR(SERVICE_CURRENT_STATE|=|1;SERVICE_CURRENT_STATE|=|2))]/
+columns[SERVICE_NAME|HOST_NAME|SERVICE_CURRENT_STATE|HOST_NAME|HOST_CURRENT_STATE|HOSTGROUP_NAME]/
+order(SERVICE_CURRENT_STATE;DESC)/countColumn=SERVICE_ID/authkey=api-ps-12345/json
+```
+
+Now we get expected results.
+
+```json
+{
+  "result":[
+    {"SERVICE_NAME":"ping4","HOST_NAME":"test","SERVICE_CURRENT_STATE":2,"HOST_CURRENT_STATE":1,"HOSTGROUP_NAME":"linux-servers","HOST_IS_PENDING":0,"SERVICE_IS_PENDING":0}],
+  "success":"true",
+  "total":1
+}
+```
+
+The trick to successful API requests is knowing the API url structure and also parameter definitions. Unfortunately I found the Icinga-Web documentation lacking for this but thankfully this is open-source so I could go hunting for them. The next section discusses my findings.
+
+## Parameters for Icinga Web API
+
+My google searches didn't uncover much documentation about what parameters were possible for the Icinga-Web API. 
+
+The Icinga2 [database definitions](https://github.com/Icinga/icinga2/blob/master/lib/db_ido_pgsql/schema/pgsql.sql) provided too much information for what I needed!  
+
+The Icinga-Web [database definitions](https://github.com/Icinga/icinga-web/blob/master/etc/schema/pgsql.sql) did not help.
+
+Digging around in the Icinga-Web source, I found the following columns located in "/usr/share/icinga-web/app/modules/Cronks/lib/js/Icinga/Cronks/Tackle/Information/Head.js". 
+
+```js
+columns_host: ['HOST_ID', 'HOST_OBJECT_ID', 'HOST_INSTANCE_ID', 'HOST_NAME', 'HOST_ALIAS', 'HOST_DISPLAY_NAME', 'HOST_ADDRESS', 'HOST_ADDRESS6', 'HOST_ACTIVE_CHECKS_ENABLED', 'HOST_CONFIG_TYPE', 'HOST_FLAP_DETECTION_ENABLED', 'HOST_PROCESS_PERFORMANCE_DATA', 'HOST_FRESHNESS_CHECKS_ENABLED', 'HOST_FRESHNESS_THRESHOLD', 'HOST_PASSIVE_CHECKS_ENABLED', 'HOST_EVENT_HANDLER_ENABLED', 'HOST_ACTIVE_CHECKS_ENABLED', 'HOST_RETAIN_STATUS_INFORMATION', 'HOST_RETAIN_NONSTATUS_INFORMATION', 'HOST_NOTIFICATIONS_ENABLED', 'HOST_OBSESS_OVER_HOST', 'HOST_FAILURE_PREDICTION_ENABLED', 'HOST_NOTES', 'HOST_NOTES_URL', 'HOST_ACTION_URL', 'HOST_ICON_IMAGE', 'HOST_ICON_IMAGE_ALT', 'HOST_IS_ACTIVE', 'HOST_OUTPUT', 'HOST_LONG_OUTPUT', 'HOST_PERFDATA', 'HOST_CURRENT_STATE', 'HOST_CURRENT_CHECK_ATTEMPT', 'HOST_MAX_CHECK_ATTEMPTS', 'HOST_LAST_CHECK', 'HOST_LAST_STATE_CHANGE', 'HOST_CHECK_TYPE', 'HOST_LATENCY', 'HOST_EXECUTION_TIME', 'HOST_NEXT_CHECK', 'HOST_HAS_BEEN_CHECKED', 'HOST_LAST_HARD_STATE_CHANGE', 'HOST_LAST_NOTIFICATION', 'HOST_PROCESS_PERFORMANCE_DATA', 'HOST_STATE_TYPE', 'HOST_IS_FLAPPING', 'HOST_PROBLEM_HAS_BEEN_ACKNOWLEDGED', 'HOST_SCHEDULED_DOWNTIME_DEPTH', 'HOST_SHOULD_BE_SCHEDULED', 'HOST_STATUS_UPDATE_TIME', 'HOST_CHECK_SOURCE'],
+
+columns_service: ['SERVICE_ID', 'SERVICE_INSTANCE_ID', 'SERVICE_CONFIG_TYPE', 'SERVICE_IS_ACTIVE', 'SERVICE_OBJECT_ID', 'SERVICE_NAME', 'SERVICE_DISPLAY_NAME', 'SERVICE_NOTIFICATIONS_ENABLED', 'SERVICE_FLAP_DETECTION_ENABLED', 'SERVICE_PASSIVE_CHECKS_ENABLED', 'SERVICE_EVENT_HANDLER_ENABLED', 'SERVICE_ACTIVE_CHECKS_ENABLED', 'SERVICE_RETAIN_STATUS_INFORMATION', 'SERVICE_RETAIN_NONSTATUS_INFORMATION', 'SERVICE_OBSESS_OVER_SERVICE', 'SERVICE_FAILURE_PREDICTION_ENABLED', 'SERVICE_NOTES', 'SERVICE_NOTES_URL', 'SERVICE_ACTION_URL', 'SERVICE_ICON_IMAGE', 'SERVICE_ICON_IMAGE_ALT', 'SERVICE_OUTPUT', 'SERVICE_LONG_OUTPUT', 'SERVICE_PERFDATA', 'SERVICE_PROCESS_PERFORMANCE_DATA', 'SERVICE_CURRENT_STATE', 'SERVICE_CURRENT_CHECK_ATTEMPT', 'SERVICE_MAX_CHECK_ATTEMPTS', 'SERVICE_LAST_CHECK', 'SERVICE_LAST_STATE_CHANGE', 'SERVICE_CHECK_TYPE', 'SERVICE_LATENCY', 'SERVICE_EXECUTION_TIME', 'SERVICE_NEXT_CHECK', 'SERVICE_HAS_BEEN_CHECKED', 'SERVICE_LAST_HARD_STATE', 'SERVICE_LAST_HARD_STATE_CHANGE', 'SERVICE_LAST_NOTIFICATION', 'SERVICE_STATE_TYPE', 'SERVICE_IS_FLAPPING', 'SERVICE_PROBLEM_HAS_BEEN_ACKNOWLEDGED', 'SERVICE_SCHEDULED_DOWNTIME_DEPTH', 'SERVICE_SHOULD_BE_SCHEDULED', 'SERVICE_STATUS_UPDATE_TIME', 'SERVICE_CHECK_SOURCE'],
+```
+
+I found other variables in "sudo vim /usr/share/icinga-web/app/modules/Cronks/data/xml/to/icinga-tactical-overview-template-charts.xml".
+
+```xml
+<datasources>
+    <datasource id="HOST_STATUS_SUMMARY">
+        <source_type>IcingaApi</source_type>
+        <target>IcingaApiConstants::TARGET_HOST_STATUS_SUMMARY_STRICT</target>
+        <columns>HOST_CURRENT_STATE,HOST_STATE_COUNT</columns>
+        <filter_mapping>
+            <map name="CUSTOMVARIABLE_NAME">HOST_CUSTOMVARIABLE_NAME</map>
+            <map name="CUSTOMVARIABLE_VALUE">HOST_CUSTOMVARIABLE_VALUE</map>
+        </filter_mapping>
+    </datasource>
+
+    <datasource id="SERVICE_STATUS_SUMMARY">
+        <source_type>IcingaApi</source_type>
+        <target>IcingaApiConstants::TARGET_SERVICE_STATUS_SUMMARY_STRICT</target>
+        <columns>SERVICE_CURRENT_STATE,SERVICE_STATE_COUNT</columns>
+        <filter_mapping>
+            <map name="CUSTOMVARIABLE_NAME">SERVICE_CUSTOMVARIABLE_NAME</map>
+            <map name="CUSTOMVARIABLE_VALUE">SERVICE_CUSTOMVARIABLE_VALUE</map>
+        </filter_mapping>
+    </datasource>
+</datasources>
+```
+
+And for constant definitions, I found this in "sudo vim /usr/share/icinga-web/app/modules/Web/lib/constants/IcingaConstants.class.php".
+
+```php
+interface IcingaConstants {
+
+    // Host states
+    const HOST_UP                           = 0;
+    const HOST_DOWN                         = 1;
+    const HOST_UNREACHABLE                  = 2;
+    const HOST_PENDING                      = 99;
+
+    // Service states
+    const STATE_OK                          = 0;
+    const STATE_WARNING                     = 1;
+    const STATE_CRITICAL                    = 2;
+    const STATE_UNKNOWN                     = 3;
+    const STATE_PENDING                     = 99;
+
+    // Logentry types
+    const NSLOG_RUNTIME_ERROR               = 1;
+    const NSLOG_RUNTIME_WARNING             = 2;
+    const NSLOG_VERIFICATION_ERROR          = 4;
+    const NSLOG_VERIFICATION_WARNING        = 8;
+    const NSLOG_CONFIG_ERROR                = 16;
+    const NSLOG_CONFIG_WARNING              = 32;
+    const NSLOG_PROCESS_INFO                = 64;
+    const NSLOG_EVENT_HANDLER               = 128;
+    /* const NSLOG_NOTIFICATION             = 256 */ // (deprecated, not used)
+    const NSLOG_EXTERNAL_COMMAND            = 512;
+    const NSLOG_HOST_UP                     = 1024;
+    const NSLOG_HOST_DOWN                   = 2048;
+    const NSLOG_HOST_UNREACHABLE            = 4096;
+    const NSLOG_SERVICE_OK                  = 8192;
+    const NSLOG_SERVICE_UNKNOWN             = 16384;
+    const NSLOG_SERVICE_WARNING             = 32768;
+    const NSLOG_SERVICE_CRITICAL            = 65536;
+    const NSLOG_PASSIVE_CHECK               = 131072;
+    const NSLOG_INFO_MESSAGE                = 262144;
+    const NSLOG_HOST_NOTIFICATION           = 524288;
+    const NSLOG_SERVICE_NOTIFICATION        = 1048576;
+
+    // Notifications reasons
+    const NOTIFICATION_NORMAL               = 0;
+    const NOTIFICATION_ACKNOWLEDGEMENT      = 1;
+    const NOTIFICATION_FLAPPINGSTART        = 2;
+    const NOTIFICATION_FLAPPINGSTOP         = 3;
+    const NOTIFICATION_FLAPPINGDISABLED     = 4;
+    const NOTIFICATION_DOWNTIMESTART        = 5;
+    const NOTIFICATION_DOWNTIMEEND          = 6;
+    const NOTIFICATION_DOWNTIMECANCELLED    = 7;
+    const NOTIFICATION_CUSTOM               = 99;
+
+    // Comments
+    const HOST_COMMENT                      = 1;
+    const SERVICE_COMMENT                   = 2;
+
+    const USER_COMMENT                      = 1;
+    const DOWNTIME_COMMENT                  = 2;
+    const FLAPPING_COMMENT                  = 3;
+    const ACKNOWLEDGEMENT_COMMENT           = 4;
+
+    // Types
+    const TYPE_HOST                         = 1;
+    const TYPE_SERVICE                      = 2;
+}
 ```
