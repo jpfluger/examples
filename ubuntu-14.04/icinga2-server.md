@@ -1099,10 +1099,42 @@ postgres=# \q
 
 ## Updates to Icinga2
 
-The Icinga2 packages for Ubuntu were recently updated, so wanted to upgrade. I found the upgrade process broke my installation. Here is how I fixed it.
+The Icinga2 packages for Ubuntu were recently updated, so want to upgrade the version on my device. I found the upgrade process was smooth for a vanilla install but broke my installation that monitors quite a few servers. 
+
+First, upgrade the Icinga2 installation. This is a distribution upgrade, so use the command `dist-upgrade`.
 
 ``bash
-$ sudo apt-get upgrade
+$ sudo apt-get dist-upgrade
+Reading package lists... Done
+Building dependency tree       
+Reading state information... Done
+Calculating upgrade... Done
+The following packages will be REMOVED:
+  python-icinga2
+The following NEW packages will be installed:
+  libyajl2 linux-headers-3.13.0-40 linux-headers-3.13.0-40-generic
+  linux-image-3.13.0-40-generic linux-image-extra-3.13.0-40-generic
+The following packages will be upgraded:
+  icinga2 icinga2-bin icinga2-common icinga2-ido-pgsql linux-generic
+  linux-headers-generic linux-image-generic
+7 upgraded, 5 newly installed, 1 to remove and 0 not upgraded.
+Need to get 63.8 MB of archives.
+After this operation, 272 MB of additional disk space will be used.
+Do you want to continue? [Y/n]
+```
+
+Click yes. Eventually we get to the installation of the next Icinga2 version. Conflicts may be found with ping and http (among others), if you have already created these within host configurations. This version of Icinga moved them to a "global" level. 
+
+I identified errors by inspecting the log left from restarting Icinga2.
+
+```bash
+$ sudo service icinga2 restart
+```
+
+If errors, inspect the startup log.
+
+```bash
+$ sudo vim /var/log/icinga2/startup.log 
 ```
 
 Manually update the database. Update scripts were not installed with the ubuntu package but I did find them on the [Icinga2 GitHub](https://github.com/Icinga/icinga2) repository, particulary in the Postgres [schema upgrade directory](https://github.com/Icinga/icinga2/tree/master/lib/db_ido_pgsql/schema/upgrade).
