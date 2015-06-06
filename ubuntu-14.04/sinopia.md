@@ -230,10 +230,10 @@ After you finish, the `.npmrc` file gets updated with additional properties.
 
 ## Sinopia private repositories
 
-Edit `config.yaml`.
+Edit `config.yaml`. You should already be in the sinopia directory.
 
 ```bash
-$ sudo vim /etc/init.d/sinopia
+$ sudo vim config.yaml
 ```
 
 Add the yaml code, as appropriate to your situtation. `loc-*:` signifies that any npm package prefixed by `loc-` will be treated as a private repository. For example, `loc-myapp` or `loc-clientapp`. The section for `*` tells Sinopia that all other packages should be reconciled against `npmjs`. The `allow_publish` command is set to `none`, which will help control accidental publishing.
