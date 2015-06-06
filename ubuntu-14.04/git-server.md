@@ -238,4 +238,12 @@ To git@FQDN:/opt/git/test.git
  * [new branch]      master -> master
 ```
 
-git remote set-url origin https://github.com/USERNAME/REPOSITORY_2.git
+Verify the url address. If inputted incorrectly, change it using `git remote`.
+
+```bash
+git remote -v
+origin	git@FQDN:/opt/git/test.git (fetch)
+origin	git@FQDN:/opt/git/test.git (push)
+
+git remote set-url origin git@FQDN:/opt/git/different-name-here.git
+```
