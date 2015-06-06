@@ -1607,7 +1607,7 @@ connect: Network is unreachable
 
 Nope.
 
-Can we ping 192.168.1.2 from an external device?
+Can we ping 192.168.78.2 from an external device?
 
 ```bash
 $ ping -c 3 192.168.78.2
