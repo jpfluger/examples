@@ -4,6 +4,8 @@
 
 These examples describe in detail different situations on how to configure networking on Ubuntu Server 14.04 with kvm-libvirt, Openvswitch, bridge-utils, bonding and vlans. I will try to shed light on what can be maddingly [confusing](https://bugs.launchpad.net/serverguide/+bug/1103870) subject matter, especially given that web-examples tend to only cover one-aspect of an implementation. This creates a situation when one reads through a 2nd tutorial, then a 3rd, 4th and 5th and they are all different but yet all correct configurations!  
 
+> Note: For those interested in OpenVSwitch, libvirt, setup of `/etc/network/interfaces` and VLANs, see [this tutorial](https://github.com/jpfluger/examples/blob/master/ubuntu-14.04/openvswitch.md).
+
 The goal is to take the mystery out of Ubuntu networking by examples. This will help you understand Ubuntu's current networking options so that you can better marry that to your own project's networking requirements.
 
 We will cover:
