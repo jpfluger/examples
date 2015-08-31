@@ -46,21 +46,23 @@ $ sudo apt-get update
 $ sudo apt-get install icinga2
 ```
 
-Verify the install via the enable-feature command `icinga2-enable-feature`. 
+Check the version number.
 
 ```bash
-$ icinga2-enable-feature
-
-#OUTPUT
-Syntax: icinga2-enable-feature <features separated with whitespaces>
-  Example: icinga2-enable-feature checker notification mainlog
-Enables the specified feature(s).
-
-Available features: api checker command compatlog debuglog graphite icingastatus livestatus mainlog notification perfdata statusdata syslog 
-Enabled features: checker mainlog notification 
+$ icinga2 --version
+icinga2 - The Icinga 2 network monitoring daemon (version: r2.3.9-1)
 ```
 
-> Note 1: `icinga2-enable-feature <NAME-OF-FEATURER>` will enable a feature and `icinga2-disable-feature <NAME-OF-FEATURER>` will disable a feature. An icinga2 restart is required after enabling or disabling features.
+View which features are enabled. 
+
+```bash
+$ sudo icinga2 feature list
+#OUTPUT
+Disabled features: api command compatlog debuglog gelf graphite icingastatus livestatus opentsdb perfdata statusdata syslog
+Enabled features: checker mainlog notification
+```
+
+> Note 1: `icinga2 feature enable <NAME-OF-FEATURER>` will enable a feature and `icinga2 feature disable <NAME-OF-FEATURER>` will disable a feature. An icinga2 restart is required after enabling or disabling features. Older releases will have used `icinga2-enable-feature` and `icinga2-disable-feature`.
 
 > Note 2: By default the `notification` feature uses email for notifications. Digital Ocean has a [tutorial](https://www.digitalocean.com/community/tutorials/how-to-install-and-setup-postfix-on-ubuntu-14-04) on setting up simple email no Ubuntu 14.04.
 
@@ -89,11 +91,11 @@ Refresh the plugins list.
 $ ls /usr/lib/nagios/plugins
 
 #OUTPUT
-check_apt      check_dbi       check_dns       check_host       check_ifoperstatus  check_ldap   check_mrtg         check_nntp      check_ntp_time  check_ping   check_rta_multi  check_spop   check_time   negate
-check_breeze   check_dhcp      check_dummy     check_hpjd       check_ifstatus      check_ldaps  check_mrtgtraf     check_nntps     check_nwstat    check_pop    check_sensors    check_ssh    check_udp    urlize
-check_by_ssh   check_dig       check_file_age  check_http       check_imap          check_load   check_mysql        check_nt        check_oracle    check_procs  check_simap      check_ssmtp  check_ups    utils.pm
-check_clamd    check_disk      check_flexlm    check_icmp       check_ircd          check_log    check_mysql_query  check_ntp       check_overcr    check_real   check_smtp       check_swap   check_users  utils.sh
-check_cluster  check_disk_smb  check_ftp       check_ide_smart  check_jabber        check_mailq  check_nagios       check_ntp_peer  check_pgsql     check_rpc    check_snmp       check_tcp    check_wave
+check_apt      check_dbi       check_dns       check_host check_ifoperstatus  check_ldap   check_mrtg     check_nntp      check_ntp_time  check_ping   check_rta_multi  check_spop   check_time   negate
+check_breeze   check_dhcp      check_dummy     check_hpjd check_ifstatus      check_ldaps  check_mrtgtraf     check_nntps     check_nwstat    check_pop  check_sensors    check_ssh    check_udp    urlize
+check_by_ssh   check_dig       check_file_age  check_http check_imap      check_load   check_mysql      check_nt      check_oracle    check_procs  check_simap    check_ssmtp  check_ups    utils.pm
+check_clamd    check_disk      check_flexlm    check_icmp check_ircd      check_log  check_mysql_query  check_ntp     check_overcr    check_real   check_smtp   check_swap   check_users  utils.sh
+check_cluster  check_disk_smb  check_ftp       check_ide_smart  check_jabber      check_mailq  check_nagios     check_ntp_peer  check_pgsql     check_rpc  check_snmp   check_tcp    check_wave
 ```
 
 Other commands, such as `ping4`, are found in the [Icinga Template Library](http://icinga2.readthedocs.org/en/latest/chapter-5.html) (ITL). The `include` directory for ITL is in `/usr/share/icinga2/include/`. 
@@ -104,10 +106,15 @@ Here are some of the ITL commands provided by `command-plugins.conf`.
 $ sudo cat /usr/share/icinga2/include/command-plugins.conf | grep CheckCommand
 
  #OUTPUT
+template CheckCommand "ipv4-or-ipv6" {
 template CheckCommand "ping-common" {
+object CheckCommand "ping" {
 object CheckCommand "ping4" {
 object CheckCommand "ping6" {
+template CheckCommand "hostalive-common" {
 object CheckCommand "hostalive" {
+object CheckCommand "hostalive4" {
+object CheckCommand "hostalive6" {
 template CheckCommand "fping-common" {
 object CheckCommand "fping4" {
 object CheckCommand "fping6" {
@@ -125,8 +132,10 @@ object CheckCommand "simap" {
 object CheckCommand "pop" {
 object CheckCommand "spop" {
 object CheckCommand "ntp_time" {
+object CheckCommand "ntp_peer" {
 object CheckCommand "ssh" {
 object CheckCommand "disk" {
+object CheckCommand "disk_smb" {
 object CheckCommand "users" {
 object CheckCommand "procs" {
 object CheckCommand "swap" {
@@ -142,7 +151,12 @@ object CheckCommand "nscp" {
 object CheckCommand "by_ssh" {
 object CheckCommand "ups" {
 object CheckCommand "nrpe" {
+object CheckCommand "hpjd" {
+object CheckCommand "icmp" {
+object CheckCommand "ldap" {
 object CheckCommand "running_kernel" {
+object CheckCommand "clamd" {
+object CheckCommand "mailq" {
 ```
 
 A template is reusable. In the output above, `ping4` and `ping6` inherit from `ping-common` and use those properties to run its checks.
@@ -171,7 +185,7 @@ $ sudo usermod -a -G nagios www-data
 Let's enable the `command` feature.
 
 ```bash
-$ sudo icinga2-enable-feature command
+$ sudo icinga2 feature enable command
 $ sudo service icinga2 restart
 ```
 
@@ -306,7 +320,7 @@ object IdoPgsqlConnection "ido-pgsql" {
 Enable the `ido-pgsql` modules because the install wizard **did not** do it for me.
 
 ```bash
-$ sudo icinga2-enable-feature ido-pgsql
+$ sudo icinga2 feature enable ido-pgsql
 ```
 
 Restart icinga2.
