@@ -461,7 +461,7 @@ We are going to install Icinga-Web, which is not Icinga-Classic nor Icinga-Web2.
 
 In order to get Icinga-Web to behave with nginx, we are going build and install Icinga-Web in one site and then point the Nginx website to it. When finished, it will look like this:
 
-* ~/icinga-web-1.11.2: This is the unpackaged source file or clone from GitHub. We configure the installation here. `make` will install the installation to a folder we specify.
+* ~/icinga-web-1.13.1: This is the unpackaged source file or clone from GitHub. We configure the installation here. `make` will install the installation to a folder we specify.
 * /usr/share/icinga-web: This is the directory in which `make` will install icinga-web. If we were running Apache, an Apache configuration file would have already been pre-generated and would point to this directory. But we are using Nginx, so add a 3rd directory which will symlink back to this one.
 * /var/www/icinga: This is the root of the Nginx directory that gets symlinked back to /usr/share/icinga-web. 
 
@@ -471,13 +471,13 @@ Download using `wget`.
 
 ```bash
 $ cd ~/
-$ wget https://github.com/Icinga/icinga-web/releases/download/v1.11.2/icinga-web-1.11.2.tar.gz
+$ wget https://github.com/Icinga/icinga-web/releases/download/v1.13.1/icinga-web-1.13.1.tar.gz
 ```
 
 Extract.
 
 ```bash
-$ tar xzvf icinga-web-1.11.2.tar.gz
+$ tar xzvf icinga-web-1.13.1.tar.gz
 ```
 
 Create the production directory for this website. 
