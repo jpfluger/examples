@@ -4,7 +4,7 @@
 
 Temporary network configurations are just that, temporary, and *not persistent* after reboot. This becomes useful to test a connection before saving it to `/etc/network/interfaces` or when configuring routers and switches via an ethernet management port.
 
-## IP Interface Inpersistent
+## IP Interface Nonpersistent
 
 Add an IP address to an interface that does not have an IP address. If multiple IPs are to be assigned to a single interface, then use network aliases (descrbed below).
 
@@ -20,7 +20,7 @@ $ sudo ip addr del 192.168.1.10/24 dev eth0
 
 If changing the IP address is desired, first delete the address then add a new one.
 
-## IP Alias Inpersistent
+## IP Alias Nonpersistent
 
 An alias is the second IP address assigned to the same network interface. The `label` parameter is followed by the alias name.
 
@@ -59,7 +59,7 @@ If not, Load the driver. No reboot is required but note this module load will no
 $ sudo modprobe 8021q
 ```
 
-# VLAN Configuration (Inpersistent)
+## VLAN Configuration (Nonpersistent)
 
 Inform the kernel of the VLAN number added to a network interface.
 
