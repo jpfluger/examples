@@ -52,7 +52,7 @@ First open the script.
 $ sudo vim /etc/init/openvswitch-switch.conf
 ```
 
-My edits appear in two places.
+The edits appear in **two** places defined by `PATCH-START` and `PATCH-END`.
 
 ```
   set ovs_ctl start --system-id=random
