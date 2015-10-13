@@ -44,6 +44,43 @@ Add `--delete-bridges` to the options line.
 OVS_CTL_OPTS='--delete-bridges'
 ```
 
+Per [this guide](http://www.opencloudblog.com/?p=240), patch the OVS upstart script.
+
+First open the script.
+
+```bash
+$ sudo vim /etc/init/openvswitch-switch.conf
+```
+
+My edits appear in two places.
+
+```
+  set ovs_ctl start --system-id=random
+  if test X"$FORCE_COREFILES" != X; then
+    set "$@" --force-corefiles="$FORCE_COREFILES"
+  fi
+  set "$@" $OVS_CTL_OPTS
+  ##### PATCH-START
+  "$@" || exit $?
+  bridges=`ifquery --allow ovs -l`
+  [ -n "${bridges}" ] && ifup --allow=ovs ${bridges}
+  logger -t ovs-start pre-start end
+  ##### PATCH-END
+end script
+
+post-stop script
+  ##### PATCH-START #####
+  logger -t ovs-stop post-stop
+  bridges=`ifquery --allow ovs -l`
+  [ -n "${bridges}" ] && ifdown --allow=ovs ${{bridges}
+  ##### PATCH-END #####
+  . /usr/share/openvswitch/scripts/ovs-lib
+  test -e /etc/default/openvswitch-switch && . /etc/default/openvswitch-switch
+
+  ovs_ctl stop
+end script
+```
+
 ## NIC Port Names
 
 Traditionally eth0 and eth1 have been designated by Linux as the standard port interfaces for ethernet port 1 and 2 (LAN 1 and LAN 2). Recently, [Dell](http://www.arachnoid.com/linux/network_names/index.html) and [RedHat](https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/6/html/Deployment_Guide/appe-Consistent_Network_Device_Naming.html) decided to rename these to correspond to the piece of hardware on which the reside and function. Ubuntu decided to follow along with the new convention, so eth0 became p4p1 and eth1 became em1. 
