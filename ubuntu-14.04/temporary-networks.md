@@ -6,7 +6,7 @@ Temporary network configurations are just that, temporary, and *not persistent* 
 
 ## IP Interface Nonpersistent
 
-Add an IP address to an interface that does not have an IP address. If multiple IPs are to be assigned to a single interface, then use network aliases (descrbed below).
+Add an IP address to an interface that does not have an IP address. If multiple IPs are to be assigned to a single interface, then use network aliases (described in the **next** section).
 
 ```bash
 $ sudo ip addr add 192.168.1.10/24 netmask 255.255.255.0 dev eth0
