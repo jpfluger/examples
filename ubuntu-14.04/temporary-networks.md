@@ -70,8 +70,10 @@ $ sudo vconfig add eth0 5
 Assign an address to VLAN 5.
 
 ```bash
-$ sudo ip addr add 192.168.1.10/24 dev eth0.5
+$ sudo ip addr add 192.168.5.10/24 dev eth0.5
 ```
+
+> Note: to get a connection the internet, you may need to set a route and set the "eth0.5" interface to its `UP` state. Directions for both are below.
 
 ## VLAN Persistance
 
@@ -86,7 +88,7 @@ Save persistent VLAN configurations in `/etc/network/interfaces`.
 ```
 auto eth0.5
 iface eth0.5 inet static
-    address 192.168.1.10
+    address 192.168.5.10
     netmask 255.255.255.0
     vlan-raw-device eth0
 ```
@@ -112,7 +114,10 @@ $ sudo ip route replace default via 192.168.1.1
 Route a network through a network interface (eg `eth0` or bridge, like `br0`).
 
 ```bash
+# through a physical interface
 $ sudo ip route add 192.168.2.0/24 dev eth0
+# through a vlan
+$ sudo ip route add 192.168.5.0/24 dev eth0.5
 ```
 
 Specify a static route through a default gateway.
@@ -127,24 +132,33 @@ $ sudo ip route add 10.0.0.1/32 via 192.168.2.1 dev eth0 src 192.168.1.10
 Delete a route.
 
 ```bash
-$ sudo ip route delete 192.168.2.0/24 dev eth0
+# target is eth0
+$ sudo ip route del 192.168.2.0/24 dev eth0
+# target is vlan 5
+$ sudo ip route del 192.168.5.0/24 dev eth0.5
 ```
 
 ## Other useful networking commands
 
-Enable an interface.
+Enable an interface. 
 
 ```bash
+# enable physical interface
 $ sudo ip link set eth0 up
+# enable a vlan
+$ sudo ip link set eth0.5 up
 ```
 
 Disable an interface.
 
 ```bash
+# enable a physical interface
 $ sudo ip link set eth0 down
+# enable a vlan
+$ sudo ip link set eth0.5 down
 ```
 
-List interfaces. `ip addr` is Layer 3. `ip link` is Layer 2.
+List interfaces. `ip addr` is Layer 3. `ip link` is Layer 2. The command `ip addr` will show if a networking interface (eg eth0.5) is `DOWN` or `UP`.
 
 ```bash
 $ sudo ip addr show
