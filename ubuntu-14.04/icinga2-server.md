@@ -71,7 +71,7 @@ During setup, the installer created the `nagios` user and group. However, the ic
 APT also installed plugins. We will refer to these in our host definitions later. For now though, feel free to check-out the available commands. On an Debian/Ubuntu system, these are found here:
 
 ```bash
-$ ls /usr/lib/nagios/plugins
+$ ls /usr/lib*/nagios/plugins
 
 #OUTPUT
 check_apt     check_cluster  check_dummy     check_host  check_ide_smart  check_jabber  check_mrtg      check_nntp   check_ntp       check_nwstat  check_pop    check_rta_multi  check_smtp  check_ssmtp  check_time  check_users  utils.pm
@@ -88,7 +88,7 @@ $ sudo apt-get install nagios-plugins
 Refresh the plugins list.
 
 ```bash
-$ ls /usr/lib/nagios/plugins
+$ ls /usr/lib*/nagios/plugins
 
 #OUTPUT
 check_apt      check_dbi       check_dns       check_host check_ifoperstatus  check_ldap   check_mrtg     check_nntp      check_ntp_time  check_ping   check_rta_multi  check_spop   check_time   negate
@@ -170,7 +170,7 @@ Icinga2 offers suggestions on what you need to do to design your own plugin. See
 Let's test the installation so far.
 
 ```bash
-$ sudo -u nagios /usr/lib/nagios/plugins/check_ping -4 -H 127.0.0.1 -c 5000,100% -w 3000,80%
+$ sudo -u nagios /usr/lib*/nagios/plugins/check_ping -4 -H 127.0.0.1 -c 5000,100% -w 3000,80%
 
 #OUTPUT
 PING OK - Packet loss = 0%, RTA = 0.06 ms|rta=0.063000ms;3000.000000;5000.000000;0.000000 pl=0%;80;100;0
@@ -774,7 +774,7 @@ As mentioned earlier, plugin commands were installed into `/usr/lib/nagios/plugi
 View help for a command by passing the targeted command the `-h` parameter.
 
 ```bash
-$ sudo /usr/lib/nagios/plugins/check_http -h | less
+$ sudo /usr/lib*/nagios/plugins/check_http -h | less
 ```
 
 Run a command, passing it arguments.
