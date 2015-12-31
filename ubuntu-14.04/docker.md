@@ -203,6 +203,7 @@ Run 'docker COMMAND --help' for more information on a command.
 For system-wide information:
 
 ```bash
+$ sudo docker info
 Containers: 1
 Images: 2
 Server Version: 1.9.1
