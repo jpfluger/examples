@@ -9,7 +9,7 @@ This guide installs [Node Version Manager](https://github.com/creationix/nvm) (a
 Install `git`, `python` for node-based custom-bindings, and a couple database clients (`postgres` and `mysql`).
 
 ```bash
-$ sudo apt-get install lsb-release libssl-dev build-essential python-all rlwrap curl git imagemagick postgresql-client mysql-client
+$ sudo apt-get install lsb-release libssl-dev build-essential python-all rlwrap curl apt-transport-https git imagemagick postgresql-client mysql-client
 ```
 
 Configure `git`.
@@ -62,14 +62,3 @@ v5.3.0
 $ sudo node --version
 v5.3.0
 ```
-
-
-https://docs.docker.com/engine/reference/builder/
-
-https://hub.docker.com/r/clkao/postgres-plv8/~/dockerfile/
-https://hub.docker.com/r/joshfinnie/nvm/~/dockerfile/
-https://hub.docker.com/r/livingdocs/nvm/~/dockerfile/
-https://hub.docker.com/r/homme/openstreetmap-tiles/
-https://github.com/phusion/baseimage-docker
-https://hub.docker.com/r/livingdocs/postgres/
-https://github.com/nodejs/docker-node
