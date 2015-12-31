@@ -72,7 +72,7 @@ post-stop script
   ##### PATCH-START #####
   logger -t ovs-stop post-stop
   bridges=`ifquery --allow ovs -l`
-  [ -n "${bridges}" ] && ifdown --allow=ovs ${{bridges}
+  [ -n "${bridges}" ] && ifdown --allow=ovs ${bridges}
   ##### PATCH-END #####
   . /usr/share/openvswitch/scripts/ovs-lib
   test -e /etc/default/openvswitch-switch && . /etc/default/openvswitch-switch
